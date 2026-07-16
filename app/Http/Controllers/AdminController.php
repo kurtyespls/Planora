@@ -43,6 +43,9 @@ class AdminController extends Controller
             'gallery' => 'nullable|string',
         ]);
 
+        // Normalize price: strip currency symbols, commas and spaces so "₱2,800" becomes "2800"
+        $validated['price'] = preg_replace('/[^0-9.]/', '', $validated['price']);
+
         Hotel::create($validated);
         CacheService::clearHotelsCache();
         return back()->with('success', 'Hotel added!');
@@ -62,6 +65,10 @@ class AdminController extends Controller
             'amenities' => 'nullable|string',
             'gallery' => 'nullable|string',
         ]);
+
+        // Normalize price: strip currency symbols, commas and spaces so "₱2,800" becomes "2800"
+        $validated['price'] = preg_replace('/[^0-9.]/', '', $validated['price']);
+
         $hotel->update($validated);
         CacheService::clearHotelsCache();
         return back()->with('success', 'Hotel updated!');

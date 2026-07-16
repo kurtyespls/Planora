@@ -1,0 +1,10 @@
+- [ ] Fix User.php - missing closing brace in casts() method
+- [ ] Fix AdminController.php - update method uses $request->all() without validation
+- [ ] Fix AdminController.php - destroy method doesn't use findOrFail
+- [ ] Fix routes/web.php - remove temporary /fix-admin route
+- [ ] Fix migration - add_user_id_to_plans_table down() method is empty
+- [ ] Fix GeocodeHotels.php - duplicate location suffix in query
+- [ ] Fix auth views - missing CSS variable definitions
+- [ ] Fix welcome view - missing CSS class definitions
+- [ ] Fix planora view - missing CSS variable definitions
+- [ ] Fix admin views - missing CSS variable definitions

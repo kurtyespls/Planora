@@ -154,16 +154,16 @@
 <body class="min-h-screen">
     <div class="flex admin-shell">
         <!-- Sidebar -->
-        <aside class="sidebar w-64 min-h-screen p-6 fixed flex flex-col">
-            <div class="mb-8">
-                <div class="flex items-center gap-3 mb-1">
-                    <span class="brand-mark" style="background:rgba(255,255,255,0.12);box-shadow:none;color:white;display:inline-flex;">⌁</span>
-                    <h2 class="text-xl font-bold text-[var(--sand)] font-display">Planora</h2>
+        <aside class="sidebar w-[var(--sidebar-width)] min-h-screen flex flex-col" id="sidebar">
+            <div class="p-5 pb-4">
+                <div class="flex items-center gap-2.5 mb-1.5">
+                    <span class="brand-mark" style="background:rgba(255,255,255,0.12);box-shadow:none;color:white;display:inline-flex;width:32px;height:32px;font-size:0.875rem;">⌁</span>
+                    <h2 class="text-lg font-bold text-[var(--sand)] font-display">Planora</h2>
                 </div>
-                <p class="font-mono text-[0.6rem] tracking-wider text-[rgba(246,237,224,0.4)] uppercase mt-1 ml-1">Admin Panel</p>
+                <p class="font-mono text-[0.6rem] tracking-wider text-[rgba(246,237,224,0.4)] uppercase ml-0.5">Admin Panel</p>
             </div>
             
-            <nav class="space-y-1 flex-1">
+            <nav class="space-y-1 flex-1 px-3">
                 <a href="/admin/hotels" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
@@ -178,21 +178,26 @@
                 </a>
             </nav>
             
-            <div class="pt-4 border-t border-[rgba(246,237,224,0.08)]">
-                <form action="/logout" method="POST">
-                    @csrf
-                    <button type="submit" class="sidebar-link w-full flex items-center gap-3 px-3 py-2.5 rounded-lg">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
-                        </svg>
-                        <span class="text-sm font-medium">Logout</span>
-                    </button>
-                </form>
+            <div class="p-3 mt-auto">
+                <div class="pt-3 border-t border-[rgba(246,237,224,0.08)]">
+                    <form action="/logout" method="POST">
+                        @csrf
+                        <button type="submit" class="sidebar-link w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                            </svg>
+                            <span class="text-sm font-medium">Logout</span>
+                        </button>
+                    </form>
+                </div>
             </div>
         </aside>
-        
+
+        <!-- Mobile Overlay -->
+        <div id="sidebarOverlay" class="sidebar-overlay fixed inset-0 bg-black/50 z-30 hidden lg:hidden" onclick="toggleSidebar()"></div>
+
         <!-- Main Content -->
-        <main class="ml-64 flex-1 p-8" style="min-height:100vh;">
+        <main class="flex-1 p-4 lg:p-8 min-h-screen">
             <header class="mb-8">
                 <div>
                     <h1 class="admin-title text-3xl font-semibold">User Management</h1>
@@ -309,5 +314,15 @@
             </div>
         </main>
     </div>
+
+    <script>
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('hidden');
+            overlay.classList.toggle('open');
+        }
+    </script>
 </body>
 </html>

@@ -445,6 +445,20 @@
         .hotel-card-enter { will-change: transform, opacity; }
         .btn-primary { will-change: transform; }
         .toast { will-change: transform, opacity; }
+
+        /* —— Hotel card image consistency —— */
+        .hotel-card-image {
+            height: 240px;
+            min-height: 240px;
+        }
+        @media (min-width: 640px) {
+            .hotel-card-image {
+                width: 320px;
+                min-width: 320px;
+                height: 100%;
+                min-height: 280px;
+            }
+        }
     </style>
 </head>
     <body class="text-[var(--ink)] min-h-screen px-4 pb-8 md:px-8" x-data="{ showProfilePanel: false }">
@@ -703,6 +717,13 @@
         let currentHotelPrice = 0;
         let allHotels = [];
 
+        // Format a stored price (e.g. "2800" or "2,800") into "2,800" with thousands separator
+        function formatPrice(price) {
+            const num = parseFloat(String(price).replace(/[₱,\s]/g, ''));
+            if (isNaN(num)) return '0';
+            return num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+        }
+
         let currentGallery = [];
         let currentImageIndex = 0;
 
@@ -832,23 +853,24 @@
                 statusEl.innerHTML = 'Select your preferred hotel to continue:';
                 list.innerHTML = '';
                 hotels.forEach((hotel, idx) => {
-                    const displayRating = (hotel.rating > 5) ? Math.floor(hotel.rating / 2) : Math.floor(hotel.rating);
-                    let stars = '★'.repeat(displayRating) + '☆'.repeat(5 - displayRating);
+                    const starRating = (hotel.rating > 5) ? Math.round(hotel.rating / 2) : Math.round(hotel.rating);
+                    const ratingText = Number(hotel.rating).toFixed(1) + ' / 10';
+                    let stars = '★'.repeat(starRating) + '☆'.repeat(5 - starRating);
                     const card = document.createElement('div');
                     card.className = "hotel-card-enter flex flex-col sm:flex-row bg-[var(--card)] border border-[var(--line)] rounded-2xl overflow-hidden shadow-sm hover:shadow-lg hover:border-[var(--ember)] transition duration-300 group";
                     card.style.animationDelay = `${idx * 60}ms`;
                     card.innerHTML = `
-                        <div class="h-48 sm:h-auto sm:w-1/2 overflow-hidden relative flex-shrink-0">
+                        <div class="hotel-card-image overflow-hidden relative flex-shrink-0">
                             <img src="${hotel.image_url}" class="w-full h-full object-cover object-center group-hover:scale-105 transition duration-500 blur-in" alt="${hotel.name}" loading="lazy" onload="this.classList.add('loaded')" onerror="this.classList.add('loaded')" style="background: var(--line);">
                         </div>
                         <div class="p-5 sm:p-6 flex-1 flex flex-col">
                             <h3 class="font-display font-semibold text-xl sm:text-2xl text-[var(--ink)] mb-1.5 leading-tight">${hotel.name}</h3>
                             <div class="flex items-center text-sm mb-3">
                                 <span class="text-[var(--ember)] text-base mr-1.5 tracking-tight">${stars}</span>
-                                <span class="font-mono font-bold text-[var(--ink-soft)] mr-1">${displayRating}</span>
+                                <span class="font-mono font-bold text-[var(--ink-soft)] mr-1">${ratingText}</span>
                             </div>
                             <p class="text-sm text-[var(--ink-soft)] mb-3 leading-relaxed">${hotel.description}</p>
-                            <div class="font-mono text-sm font-bold text-[var(--deep-teal)] mb-5">₱${hotel.price} / night</div>
+                            <div class="font-mono text-sm font-bold text-[var(--deep-teal)] mb-5">₱${formatPrice(hotel.price)} / night</div>
                             <div class="flex flex-col sm:flex-row gap-2.5 mt-auto">
                                 <button onclick="openHotelModal(${idx})" class="focus-ring w-full sm:flex-1 bg-transparent border-[1.5px] border-[var(--line)] text-[var(--ink-soft)] py-3 px-4 rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 hover:border-[var(--deep-teal)] hover:text-[var(--deep-teal)] transition-all">View details</button>
                                 <button onclick="selectHotel(${idx})" class="btn-primary focus-ring w-full sm:flex-1 py-3 px-4 rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 whitespace-nowrap">Select this hotel</button>
@@ -881,15 +903,16 @@
             currentHotelPrice = parseFloat(String(hotel.price).replace(/[₱,]/g, ''));
             preserveHotelSelection(idx);
             document.getElementById('display-selected-hotel').innerText = hotel.name;
-            const displayRating = (hotel.rating > 5) ? Math.floor(hotel.rating / 2) : Math.floor(hotel.rating);
-            const stars = '★'.repeat(displayRating) + '☆'.repeat(5 - displayRating);
+            const starRating = (hotel.rating > 5) ? Math.round(hotel.rating / 2) : Math.round(hotel.rating);
+            const ratingText = Number(hotel.rating).toFixed(1) + ' / 10';
+            const stars = '★'.repeat(starRating) + '☆'.repeat(5 - starRating);
             const imgEl = document.getElementById('selected-hotel-image');
             imgEl.src = hotel.image_url;
             imgEl.alt = hotel.name;
             setupBlurIn(imgEl);
             document.getElementById('selected-hotel-stars').innerText = stars;
-            document.getElementById('selected-hotel-rating').innerText = displayRating;
-            document.getElementById('selected-hotel-description').innerText = `Rate: ₱${hotel.price} / night`;
+            document.getElementById('selected-hotel-rating').innerText = ratingText;
+            document.getElementById('selected-hotel-description').innerText = `Rate: ₱${formatPrice(hotel.price)} / night`;
             document.getElementById('step-1').classList.remove('active');
             document.getElementById('step-2').classList.add('active');
             setActiveStub(2);
@@ -957,7 +980,7 @@
                     budget: budget,
                     rest_days: restDays,
                     weather_desc: 'Weather data not available',
-                    nearby_places: nearbyPlacesData.join(', ')
+                    nearby_places: nearbyPlacesData.join('|')
                 })
             })
             .then(async res => {
@@ -1249,7 +1272,7 @@
             const lon = hotel.lon || selectedLon;
             document.getElementById('modal-address-text').innerText = hotel.address || 'Dagupan City, Pangasinan — view on map';
             document.getElementById('modal-address-link').href = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
-            document.getElementById('modal-price').innerText = `₱${hotel.price} / night`;
+            document.getElementById('modal-price').innerText = `₱${formatPrice(hotel.price)} / night`;
             currentGallery = hotel.gallery ? hotel.gallery.split(',').map(s => s.trim()) : [hotel.image_url];
             currentImageIndex = 0;
             updateSliderImage();
@@ -1420,15 +1443,16 @@
                 hotelList.innerHTML = '';
                 filtered.forEach((hotel, idx) => {
                     const originalIdx = allHotels.findIndex(h => h.id === hotel.id);
-                    const displayRating = (hotel.rating > 5) ? Math.floor(hotel.rating / 2) : Math.floor(hotel.rating);
-                    const stars = '★'.repeat(displayRating) + '☆'.repeat(5 - displayRating);
+                    const starRating = (hotel.rating > 5) ? Math.round(hotel.rating / 2) : Math.round(hotel.rating);
+                    const ratingText = Number(hotel.rating).toFixed(1) + ' / 10';
+                    const stars = '★'.repeat(starRating) + '☆'.repeat(5 - starRating);
                     const isExactMatch = hotel.name.toLowerCase() === lowerQuery;
                     const card = document.createElement('div');
                     card.className = `hotel-card-enter flex flex-col sm:flex-row bg-[var(--card)] border ${isExactMatch ? 'border-[var(--ember)]' : 'border-[var(--line)]'} rounded-2xl overflow-hidden shadow-sm hover:shadow-lg hover:border-[var(--ember)] transition duration-300 group cursor-pointer`;
                     card.style.animationDelay = `${idx * 60}ms`;
                     card.onclick = () => selectHotel(originalIdx);
                     card.innerHTML = `
-                        <div class="h-48 sm:h-auto sm:w-1/2 overflow-hidden relative flex-shrink-0">
+                        <div class="hotel-card-image overflow-hidden relative flex-shrink-0">
                             <img src="${hotel.image_url}" class="w-full h-full object-cover object-center group-hover:scale-105 transition duration-500 blur-in" alt="${hotel.name}" loading="lazy" onload="this.classList.add('loaded')" onerror="this.classList.add('loaded')" style="background: var(--line);">
                             ${isExactMatch ? '<span class="absolute top-2 left-2 bg-[var(--deep-teal)] text-white text-xs px-3 py-1 rounded-full font-mono font-bold shadow-lg">EXACT MATCH</span>' : ''}
                         </div>
@@ -1436,10 +1460,10 @@
                             <h3 class="font-display font-semibold text-xl sm:text-2xl text-[var(--ink)] mb-1.5 leading-tight">${hotel.name}</h3>
                             <div class="flex items-center text-sm mb-3">
                                 <span class="text-[var(--ember)] text-base mr-1.5 tracking-tight">${stars}</span>
-                                <span class="font-mono font-bold text-[var(--ink-soft)] mr-1">${displayRating}</span>
+                                <span class="font-mono font-bold text-[var(--ink-soft)] mr-1">${ratingText}</span>
                             </div>
                             <p class="text-sm text-[var(--ink-soft)] mb-3 leading-relaxed">${hotel.description || 'No description available'}</p>
-                            <div class="font-mono text-sm font-bold text-[var(--deep-teal)] mb-5">₱${hotel.price} / night</div>
+                            <div class="font-mono text-sm font-bold text-[var(--deep-teal)] mb-5">₱${formatPrice(hotel.price)} / night</div>
                             <div class="flex flex-col sm:flex-row gap-2.5 mt-auto">
                                 <button onclick="event.stopPropagation(); openHotelModal(${originalIdx})" class="focus-ring w-full sm:flex-1 bg-transparent border-[1.5px] border-[var(--line)] text-[var(--ink-soft)] py-3 px-4 rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 hover:border-[var(--deep-teal)] hover:text-[var(--deep-teal)] transition-all">View details</button>
                                 <button onclick="event.stopPropagation(); selectHotel(${originalIdx})" class="btn-primary focus-ring w-full sm:flex-1 py-3 px-4 rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 whitespace-nowrap">Select this hotel</button>

@@ -220,7 +220,7 @@ class PlanoraController extends Controller
         $totalHotelCost = 0;
 
         if ($hotel) {
-            $nightlyRate = (float) str_replace([',', ' '], '', $hotel->price);
+            $nightlyRate = (float) preg_replace('/[^\d.]/', '', $hotel->price);
             $totalHotelCost = $nightlyRate * $validated['days'];
 
             if ($validated['budget'] < $totalHotelCost) {
@@ -335,7 +335,7 @@ Formatting rules — these matter:
         if (trim($raw) === '') {
             return 'No nearby places found via online maps. Focus purely on hotel amenities.';
         }
-        $items = array_filter(array_map('trim', explode(',', $raw)));
+        $items = array_filter(array_map('trim', explode('|', $raw)));
         $items = array_slice($items, 0, $limit);
         return implode(', ', $items);
     }
@@ -376,7 +376,7 @@ Formatting rules — these matter:
         $totalBudget = $data['budget'];
         
         $pois = !empty($data['nearby_places'])
-            ? array_filter(array_map('trim', explode(',', $data['nearby_places'])))
+            ? array_filter(array_map('trim', explode('|', $data['nearby_places'])))
             : [];
         $pois = array_values($pois);
         $poiCount = count($pois);

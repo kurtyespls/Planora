@@ -34,7 +34,7 @@ class ThrottleApi
             $key,
             $maxAttempts,
             function () {},
-            $decayMinutes
+            $decayMinutes * 60
         );
 
         if (!$executed) {

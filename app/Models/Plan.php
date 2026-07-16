@@ -16,10 +16,10 @@ class Plan extends Model
      */
     protected $fillable = [
         'user_id',
-        'hotel_name', 
-        'budget', 
-        'total_days', 
-        'rest_days', 
+        'hotel_name',
+        'budget',
+        'total_days',
+        'rest_days',
         'ai_recommendation'
     ];
 
