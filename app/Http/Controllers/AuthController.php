@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
@@ -35,16 +36,31 @@ class AuthController extends Controller
             return back()->withErrors($validator)->withInput();
         }
 
-        $user = User::create([
-            'name'     => $request->name,
-            'email'    => $request->email,
-            'password' => Hash::make($request->password),
-            'role'     => 'user',
-        ]);
+        try {
+            $user = User::create([
+                'name'     => $request->name,
+                'email'    => $request->email,
+                'password' => Hash::make($request->password),
+                'role'     => 'user',
+            ]);
 
-        Auth::login($user);
+            Auth::login($user);
 
-        return redirect('/planora')->with('success', 'Account created! Welcome to Planora.');
+            Log::info('User registered', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'endpoint' => 'register',
+            ]);
+
+            return redirect('/planora')->with('success', 'Account created! Welcome to Planora.');
+        } catch (\Exception $e) {
+            Log::error('Registration failed', [
+                'message' => $e->getMessage(),
+                'email' => $request->email,
+                'endpoint' => 'register',
+            ]);
+            return back()->withErrors(['email' => 'Registration failed. Please try again.'])->withInput();
+        }
     }
 
     public function login(Request $request)
@@ -56,13 +72,18 @@ class AuthController extends Controller
 
         if (Auth::attempt($credentials, $request->filled('remember'))) {
             $request->session()->regenerate();
-            
-            // Redirect based on user role
+
             $user = Auth::user();
+            Log::info('User logged in', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'endpoint' => 'login',
+            ]);
+
             if ($user->role === 'admin') {
                 return redirect()->intended('/admin/hotels');
             }
-            
+
             return redirect()->intended('/planora');
         }
 
@@ -73,9 +94,16 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
+        $userId = auth()->id();
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
+
+        Log::info('User logged out', [
+            'user_id' => $userId,
+            'endpoint' => 'logout',
+        ]);
+
         return redirect('/login');
     }
 
@@ -134,33 +162,76 @@ class AuthController extends Controller
 
     public function showProfile($id)
     {
-        $user = User::with('plans')->findOrFail($id);
-        return view('profile.show', compact('user'));
+        // Authorization: users can only view their own profile
+        if ((int) $id !== (int) auth()->id()) {
+            Log::warning('Unauthorized profile view attempt', [
+                'requested_user_id' => $id,
+                'auth_user_id' => auth()->id(),
+                'endpoint' => 'showProfile',
+            ]);
+            return redirect('/planora')->with('error', 'You are not authorized to view this profile.');
+        }
+
+        try {
+            $user = User::with('plans')->findOrFail($id);
+            return view('profile.show', compact('user'));
+        } catch (\Exception $e) {
+            Log::error('Failed to load profile', [
+                'message' => $e->getMessage(),
+                'user_id' => $id,
+                'endpoint' => 'showProfile',
+            ]);
+            return redirect('/planora')->with('error', 'Unable to load profile.');
+        }
     }
 
     public function updateProfile(Request $request, $id)
     {
-        $user = User::findOrFail($id);
-
-        $validator = Validator::make($request->all(), [
-            'name'     => 'required|string|max:255',
-            'email'    => 'required|string|email|max:255|unique:users,email,' . $id,
-            'password' => 'nullable|string|min:6|confirmed',
-        ]);
-
-        if ($validator->fails()) {
-            return back()->withErrors($validator)->withInput();
+        // Authorization: users can only update their own profile
+        if ((int) $id !== (int) auth()->id()) {
+            Log::warning('Unauthorized profile update attempt', [
+                'requested_user_id' => $id,
+                'auth_user_id' => auth()->id(),
+                'endpoint' => 'updateProfile',
+            ]);
+            return redirect('/planora')->with('error', 'You are not authorized to update this profile.');
         }
 
-        $user->name = $request->name;
-        $user->email = $request->email;
+        try {
+            $user = User::findOrFail($id);
 
-        if ($request->filled('password')) {
-            $user->password = Hash::make($request->password);
+            $validator = Validator::make($request->all(), [
+                'name'     => 'required|string|max:255',
+                'email'    => 'required|string|email|max:255|unique:users,email,' . $id,
+                'password' => 'nullable|string|min:6|confirmed',
+            ]);
+
+            if ($validator->fails()) {
+                return back()->withErrors($validator)->withInput();
+            }
+
+            $user->name = $request->name;
+            $user->email = $request->email;
+
+            if ($request->filled('password')) {
+                $user->password = Hash::make($request->password);
+            }
+
+            $user->save();
+
+            Log::info('Profile updated', [
+                'user_id' => $id,
+                'endpoint' => 'updateProfile',
+            ]);
+
+            return back()->with('success', 'Profile updated successfully!');
+        } catch (\Exception $e) {
+            Log::error('Profile update failed', [
+                'message' => $e->getMessage(),
+                'user_id' => $id,
+                'endpoint' => 'updateProfile',
+            ]);
+            return back()->withErrors(['error' => 'Failed to update profile. Please try again.']);
         }
-
-        $user->save();
-
-        return back()->with('success', 'Profile updated successfully!');
     }
 }

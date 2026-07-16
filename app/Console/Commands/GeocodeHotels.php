@@ -6,6 +6,7 @@ use App\Models\Hotel;
 use App\Services\CacheService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class GeocodeHotels extends Command
 {
@@ -92,8 +93,7 @@ class GeocodeHotels extends Command
     private function geocode(string $query): ?array
     {
         try {
-            $response = Http::withoutVerifying()
-                ->timeout(10)
+            $response = Http::timeout(10)
                 ->withHeaders([
                     'User-Agent' => 'PlanoraItineraryApp/1.0 (dagupan-travel-planner)',
                     'Accept-Language' => 'en',
@@ -105,11 +105,19 @@ class GeocodeHotels extends Command
                 ]);
 
             if (!$response->successful()) {
+                Log::warning('Nominatim geocode request failed', [
+                    'status' => $response->status(),
+                    'query' => $query,
+                    'endpoint' => 'nominatim.openstreetmap.org',
+                ]);
                 return null;
             }
 
             $data = $response->json();
             if (empty($data) || !isset($data[0]['lat'])) {
+                Log::info('Nominatim returned no results', [
+                    'query' => $query,
+                ]);
                 return null;
             }
 
@@ -128,7 +136,12 @@ class GeocodeHotels extends Command
                 'address' => !empty($addressParts) ? implode(', ', $addressParts) : ($result['display_name'] ?? null),
             ];
         } catch (\Exception $e) {
-            $this->warn("  [HTTP Error] {$e->getMessage()}");
+            $this->warn("  [HTTP Error] Geocode request failed for: {$query}");
+            Log::error('Nominatim geocode exception', [
+                'message' => $e->getMessage(),
+                'query' => $query,
+                'endpoint' => 'nominatim.openstreetmap.org',
+            ]);
             return null;
         }
     }

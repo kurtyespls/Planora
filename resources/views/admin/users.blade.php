@@ -222,15 +222,15 @@
             <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
                 <div class="bg-[var(--card)] border border-[var(--line)] stat-card p-5 rounded-xl">
                     <p class="text-xs font-mono uppercase tracking-wider text-[var(--sage)] mb-1">Total Users</p>
-                    <p class="text-3xl font-bold text-[var(--ink)] font-display">{{ $users->count() }}</p>
+                    <p class="text-3xl font-bold text-[var(--ink)] font-display">{{ $users->total() }}</p>
                 </div>
                 <div class="bg-[var(--card)] border border-[var(--line)] stat-card p-5 rounded-xl" style="border-top-color:var(--ember);">
                     <p class="text-xs font-mono uppercase tracking-wider text-[var(--sage)] mb-1">Admins</p>
-                    <p class="text-3xl font-bold text-[var(--ink)] font-display">{{ $users->where('role', 'admin')->count() }}</p>
+                    <p class="text-3xl font-bold text-[var(--ink)] font-display">{{ $adminCount ?? $users->where('role', 'admin')->count() }}</p>
                 </div>
                 <div class="bg-[var(--card)] border border-[var(--line)] stat-card p-5 rounded-xl" style="border-top-color:var(--ember);">
                     <p class="text-xs font-mono uppercase tracking-wider text-[var(--sage)] mb-1">Regular Users</p>
-                    <p class="text-3xl font-bold text-[var(--ink)] font-display">{{ $users->where('role', 'user')->count() }}</p>
+                    <p class="text-3xl font-bold text-[var(--ink)] font-display">{{ $userCount ?? $users->where('role', 'user')->count() }}</p>
                 </div>
             </div>
             

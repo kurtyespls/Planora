@@ -602,9 +602,9 @@
                     
                     <!-- Results count -->
                     <div class="mt-4 flex items-center justify-between text-sm">
-                        <p class="text-[var(--ink-soft)]">
-                            Showing <span class="font-semibold text-[var(--ink)]" id="resultsCount">{{ $hotels->count() }}</span> hotels
-                        </p>
+                                <p class="text-[var(--ink-soft)]">
+                                    Showing <span class="font-semibold text-[var(--ink)]" id="resultsCount">{{ $hotels->total() }}</span> hotels
+                                </p>
                         <button onclick="clearFilters()" class="text-[var(--ember-deep)] hover:text-[var(--deep-teal)] font-semibold text-sm transition hidden" id="clearFilters">
                             Clear Filters
                         </button>
@@ -948,7 +948,7 @@
 
     <script>
         // Hotel data for modals
-        const hotelsData = @json($hotels);
+        const hotelsData = @json($hotels->items());
         let currentHotelId = null;
 
         // Modal functions
