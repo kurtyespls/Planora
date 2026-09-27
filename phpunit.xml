@@ -32,5 +32,8 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <env name="GROQ_API_KEY" value=""/>
+        <env name="OPENWEATHER_API_KEY" value=""/>
+
     </php>
 </phpunit>

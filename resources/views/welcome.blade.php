@@ -8,6 +8,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="stylesheet" href="/css/planora-design.css">
     <style>
         /* ── Mobile-First Responsive Overrides ── */
@@ -322,7 +324,7 @@
     <!-- ── Navigation ── -->
     <nav class="travel-nav" style="position:fixed;top:0;left:0;right:0;z-index:50;background:rgba(11,61,58,0.08);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,255,255,0.1);height:72px;">
         <div class="nav-container" style="max-width:1180px;margin:auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:100%;">
-            <a href="/" class="brand" style="color:white;"><span class="brand-mark" style="background:rgba(255,255,255,0.15);color:white;box-shadow:none;">⌁</span><span style="font-weight:800;">planora</span></a>
+            <a href="/" class="brand" style="color:white;"><span class="brand-mark" style="background:rgba(255,255,255,0.15);color:white;box-shadow:none;">⌁<img src="/images/planora-logo-sm.png" alt="" class="brand-logo" onerror="this.remove()"></span><span style="font-weight:800;">planora</span></a>
             <div class="flex items-center gap-2 sm:gap-3">
                 <a href="/login" class="nav-btn px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-bold text-white/80 hover:text-white transition" style="text-decoration:none;">Sign in</a>
                 <a href="/register" class="nav-btn-plan px-5 sm:px-6 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-bold" style="background:var(--ember);color:white;text-decoration:none;box-shadow:0 8px 24px rgba(217,98,43,0.3);transition:all 0.25s ease;" onmouseover="this.style.background='var(--ember-deep)';this.style.transform='translateY(-2px)';this.style.boxShadow='0 12px 32px rgba(217,98,43,0.4)';" onmouseout="this.style.background='var(--ember)';this.style.transform='translateY(0)';this.style.boxShadow='0 8px 24px rgba(217,98,43,0.3)';">Plan a trip</a>

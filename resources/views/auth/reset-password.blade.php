@@ -8,6 +8,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="stylesheet" href="/css/planora-design.css">
     <style>
         .input-group {
@@ -161,7 +163,7 @@
                     <p>Choose a strong password for your account.</p>
                 </div>
 
-                <a href="/planora" class="brand" style="margin-bottom:8px;"><span class="brand-mark">⌁</span><span>planora</span></a>
+                <a href="/planora" class="brand" style="margin-bottom:8px;"><span class="brand-mark">⌁<img src="/images/planora-logo-sm.png" alt="" class="brand-logo" onerror="this.remove()"></span><span>planora</span></a>
                 <h1>Set new password</h1>
                 <p class="auth-subtitle">Create a new password for your account.</p>
 

@@ -3,9 +3,10 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Models\Location;
 use App\Services\PlanoraService;
-use App\Services\CacheService;
 use Illuminate\Support\Facades\Log;
+use Closure;
 
 class PlanoraController extends Controller
 {
@@ -16,15 +17,43 @@ class PlanoraController extends Controller
         $this->planoraService = $planoraService;
     }
 
-    private const REST_OPTIONS = ['Morning', 'Afternoon', 'Night Shift', 'Whole Day'];
+    // Valid rest-schedule values live in PlanoraService::REST_OPTIONS so that
+    // validation and itinerary generation can never drift apart.
 
+    /**
+     * Role-aware entry point para sa bare domain: ang bisita ay nakakakita ng
+     * marketing page, ang naka-sign in na tourist ay dumadaan sa planner, at
+     * ang admin ay direktang pinapasok sa control center.
+     *
+     * Ang `/planora` ay sineserbisyuhan ng index() — hindi ng method na ito —
+     * dahil doon naka-point ang "View Live App" (sidebar) at "Visit App"
+     * (topbar) ng admin panel. Dapat buksan nila ang public app kahit may
+     * aktibong admin session; dati ay bumabalik lang sila sa /admin/hotels.
+     */
+    public function home()
+    {
+        if (auth()->check() && auth()->user()->role === 'admin') {
+            return redirect('/admin/hotels');
+        }
+
+        return $this->index();
+    }
+
+    /**
+     * Ang public app: planner para sa naka-sign in, landing page para sa bisita.
+     */
     public function index()
     {
         if (auth()->check()) {
-            if (auth()->user()->role === 'admin') {
-                return redirect('/admin/hotels');
-            }
-            return view('planora');
+            return view('planora', [
+                // Exposed so the client-side estimate mirrors the server-side
+                // budget rule instead of re-deriving it (see PlanoraService).
+                'nightsOffset' => PlanoraService::NIGHTS_PER_DAY_OFFSET,
+                'aiEnabled' => (bool) config('services.groq.key'),
+                // Preset rest windows: isang source of truth para sa UI at sa
+                // validation sa server (ang oras ay pwedeng i-edit ng user).
+                'restWindows' => PlanoraService::REST_WINDOWS,
+            ]);
         }
         return view('welcome');
     }
@@ -64,12 +93,61 @@ class PlanoraController extends Controller
         }
     }
 
+    /**
+     * Curated Dagupan points of interest from the local `locations` table.
+     *
+     * Replaces the previous stub that always returned an empty array, which
+     * made every check-in attempt fail with "Spot not found".
+     */
+    public function getTouristSpots(Request $request)
+    {
+        $term = trim((string) $request->query('q', ''));
+        $category = trim((string) $request->query('category', ''));
+        $categories = [
+            Location::CATEGORY_RESTAURANT,
+            Location::CATEGORY_MALL,
+            Location::CATEGORY_BEACH,
+            Location::CATEGORY_TOURIST,
+        ];
+
+        try {
+            $spots = Location::query()
+                ->when(
+                    in_array($category, $categories, true),
+                    fn ($query) => $query->ofCategory($category)
+                )
+                ->when(
+                    $term !== '',
+                    fn ($query) => $query->where('name', 'like', '%' . $term . '%')
+                )
+                ->orderBy('name')
+                ->limit(20)
+                ->get(['id', 'name', 'category', 'latitude', 'longitude']);
+
+            return response()->json($spots->map(fn (Location $spot) => [
+                'id'       => $spot->id,
+                'name'     => $spot->name,
+                'category' => $spot->category,
+                'lat'      => $spot->latitude,
+                'lon'      => $spot->longitude,
+            ]));
+        } catch (\Exception $e) {
+            Log::error('Error fetching tourist spots', [
+                'message' => $e->getMessage(),
+                'user_id' => auth()->id(),
+                'endpoint' => 'getTouristSpots',
+                'q' => $term,
+            ]);
+            return response()->json(['error' => 'Failed to load tourist spots.'], 500);
+        }
+    }
+
     public function getWeather(Request $request)
     {
         $lat = (float) $request->query('lat', 16.0438);
         $lon = (float) $request->query('lon', 120.3331);
 
-        $apiKey = env('OPENWEATHER_API_KEY');
+        $apiKey = config('services.openweather.key');
         if (!$apiKey) {
             Log::warning('Weather service not configured', [
                 'user_id' => auth()->id(),
@@ -109,8 +187,20 @@ class PlanoraController extends Controller
             'hotel'          => 'required|string|max:255',
             'budget'         => 'required|numeric|min:1',
             'days'           => 'required|integer|min:1|max:30',
-            'rest_days'      => 'nullable|array',
-            'rest_days.*'    => 'string|in:' . implode(',', self::REST_OPTIONS),
+            'rest_days'      => 'nullable|array|max:4',
+            // Tumatanggap ng preset label ('Morning') O custom na oras na
+            // pinili ng traveller ('14:00-16:00'). Ang `in:` at `regex:` ay
+            // hindi maaaring pagsamahin sa isang rule array (AND ang ibig
+            // sabihin), kaya closure ang ginagamit para sa "alinman sa".
+            'rest_days.*'    => [
+                'string',
+                'max:20',
+                function (string $attribute, mixed $value, Closure $fail) {
+                    if (!PlanoraService::isValidRestEntry((string) $value)) {
+                        $fail('Each rest entry must be a preset like "Morning" or a time window like "14:00-16:00".');
+                    }
+                },
+            ],
             'weather_desc'   => 'nullable|string|max:255',
             'nearby_places'  => 'nullable|string',
         ]);
@@ -130,6 +220,7 @@ class PlanoraController extends Controller
                 'recommendation' => $result['recommendation'],
                 'budget_warning' => $result['budget_warning'],
                 'daily_allowance' => $result['daily_allowance'],
+                'ai_provider' => $result['ai_provider'] ?? 'local',
             ]);
         } catch (\Exception $e) {
             Log::error('Critical Execution Failure in generatePlan', [

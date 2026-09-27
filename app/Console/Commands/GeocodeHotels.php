@@ -21,6 +21,16 @@ class GeocodeHotels extends Command
      */
     private const NOMINATIM_BASE = 'https://nominatim.openstreetmap.org/search';
 
+    /**
+     * Fallback locality appended when services.nominatim.suffix is not set.
+     */
+    private const DEFAULT_LOCATION_SUFFIX = ', Dagupan City, Pangasinan, Philippines';
+
+    /**
+     * Narrower hint used when the full name returns nothing.
+     */
+    private const NARROW_LOCATION_SUFFIX = ', Dagupan City';
+
     public function handle(): int
     {
         $query = Hotel::query();
@@ -54,8 +64,9 @@ class GeocodeHotels extends Command
                 $successCount++;
                 $this->line("  ✓ {$hotel->name} → ({$result['lat']}, {$result['lon']})");
             } else {
-                // Fallback: try with "Dagupan City" suffix
-                $result = $this->geocode($hotel->name . ', Dagupan City, Pangasinan');
+                // Fallback: retry with a narrower locality hint. geocode()
+                // applies the suffix itself, so it is never duplicated.
+                $result = $this->geocode($hotel->name, narrow: true);
                 if ($result) {
                     $hotel->lat = $result['lat'];
                     $hotel->lon = $result['lon'];
@@ -89,16 +100,24 @@ class GeocodeHotels extends Command
 
     /**
      * Geocode a single query string via Nominatim.
+     *
+     * The location suffix is appended here and nowhere else, so callers must
+     * pass the bare place name. Pass $narrow = true to retry an ambiguous name
+     * with a city-level hint only.
      */
-    private function geocode(string $query): ?array
+    private function geocode(string $query, bool $narrow = false): ?array
     {
+        $suffix = $narrow
+            ? self::NARROW_LOCATION_SUFFIX
+            : (string) config('services.nominatim.suffix', self::DEFAULT_LOCATION_SUFFIX);
+
         try {
             $response = Http::timeout(10)
                 ->withHeaders([
                     'User-Agent' => 'PlanoraItineraryApp/1.0 (dagupan-travel-planner)',
                     'Accept-Language' => 'en',
                 ])->get(self::NOMINATIM_BASE, [
-                    'q' => $query . ', Dagupan City, Pangasinan, Philippines',
+                    'q' => $query . $suffix,
                     'format' => 'json',
                     'limit' => 1,
                     'addressdetails' => 1,

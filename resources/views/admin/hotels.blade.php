@@ -1,16 +1,12 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <title>Planora Admin — Hotel Management</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/css/planora-design.css">
-    <style>
-        /* Enhanced Admin Panel Design */
+@extends('layouts.admin')
+
+@section('title', 'Hotels & Accommodations')
+@section('page_title', 'Hotel Management')
+@section('page_subtitle', 'Manage hotel inventory, details, and room rates')
+
+@push('styles')
+<style>
+/* Enhanced Admin Panel Design */
         :root {
             --sidebar-width: 260px;
         }
@@ -61,61 +57,142 @@
             height: 60%;
         }
         
-        /* Table Enhancements */
-        .hotel-table {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 0;
+        /* Hotel Card Grid */
+        .hotel-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.25rem;
         }
-        
-        .hotel-table thead {
-            position: sticky;
-            top: 0;
-            z-index: 10;
+
+        @media (min-width: 768px) {
+            .hotel-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
-        
-        .hotel-table thead th {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.7rem;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: var(--sage);
-            font-weight: 600;
+
+        @media (min-width: 1280px) {
+            .hotel-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        }
+
+        .hotel-card {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+                        box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+                        border-color 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .hotel-card:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--shadow-lg);
+            border-color: rgba(217, 98, 43, 0.4);
+        }
+
+        .hotel-card-cover {
+            position: relative;
+            height: 11rem;
             background: var(--sand-deep);
-            border-bottom: 1px solid var(--line);
-            padding: 1rem 1.25rem;
-            text-align: left;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        .hotel-card-cover img {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center;
+            transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .hotel-card:hover .hotel-card-cover img {
+            transform: scale(1.04);
+        }
+
+        .hotel-card-cover-empty {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--sage);
+            background: linear-gradient(135deg, rgba(11,61,58,0.05) 0%, transparent 60%), var(--sand-deep);
+        }
+
+        .hotel-card-badge {
+            position: absolute;
+            top: 0.75rem;
+            right: 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.3rem 0.7rem;
+            border-radius: 9999px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            font-weight: 700;
+            background: rgba(255, 253, 249, 0.92);
+            color: var(--deep-teal);
+            box-shadow: 0 4px 14px rgba(11,61,58,0.12);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+        }
+
+        .hotel-card-body {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            padding: 1.25rem;
+        }
+
+        .hotel-card-title {
+            font-family: 'DM Serif Display', serif;
+            font-size: 1.2rem;
+            font-weight: 600;
+            line-height: 1.25;
+            color: var(--ink);
+        }
+
+        .hotel-card-stars {
+            color: var(--ember);
+            font-size: 0.9rem;
+            letter-spacing: -0.05em;
+        }
+
+        .hotel-card-price {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--deep-teal);
+        }
+
+        .hotel-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.2rem 0.55rem;
+            border-radius: 9999px;
+            background: var(--sand-deep);
+            color: #3b5046;
+            font-size: 0.68rem;
+            font-weight: 600;
             white-space: nowrap;
         }
-        
-        .hotel-table tbody tr {
-            border-bottom: 1px solid rgba(226, 216, 196, 0.5);
-            transition: all 0.2s ease;
-            position: relative;
+
+        .hotel-card-actions {
+            margin-top: auto;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding-top: 1rem;
+            border-top: 1px dashed var(--line);
         }
-        
-        .hotel-table tbody tr:hover {
-            background: rgba(11,61,58,0.025);
-            transform: translateX(4px);
-        }
-        
-        .hotel-table td {
-            padding: 1.125rem 1.25rem;
-            vertical-align: middle;
-        }
-        
-        /* Responsive Table */
-        @media (max-width: 768px) {
-            .hotel-table thead th,
-            .hotel-table td {
-                padding: 0.75rem 0.5rem;
-                font-size: 0.875rem;
-            }
-            
-            .hotel-table thead th {
-                font-size: 0.65rem;
-                letter-spacing: 0.05em;
-            }
+
+        .hotel-card-empty {
+            grid-column: 1 / -1;
         }
         
         /* Buttons - Enhanced */
@@ -430,27 +507,17 @@
         }
         
         @media (max-width: 768px) {
-            .hotel-table tbody tr:hover {
-                transform: none;
+            .hotel-card-cover {
+                height: 9.5rem;
             }
-            
-            /* Stack table cells on mobile */
-            .hotel-table tbody tr {
-                display: flex;
-                flex-wrap: wrap;
-                border-bottom: 1px solid var(--line);
-                padding: 1rem 0;
+
+            .hotel-card-body {
+                padding: 1rem;
             }
-            
-            .hotel-table tbody td {
-                display: block;
-                width: 100%;
-                padding: 0.5rem 0;
-                border-bottom: none;
-            }
-            
-            .hotel-table thead {
-                display: none;
+
+            .hotel-card-actions .btn-secondary,
+            .hotel-card-actions .btn-primary {
+                flex: 1;
             }
         }
         
@@ -487,69 +554,11 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
-    </style>
-</head>
-<body class="min-h-screen">
-    <div class="flex admin-shell">
-        <!-- Sidebar -->
-        <aside class="sidebar w-[var(--sidebar-width)] min-h-screen flex flex-col" id="sidebar">
-            <div class="p-5 pb-4">
-                <div class="flex items-center gap-2.5 mb-1.5">
-                    <span class="brand-mark" style="background:rgba(255,255,255,0.12);box-shadow:none;color:white;display:inline-flex;width:32px;height:32px;font-size:0.875rem;">⌁</span>
-                    <h2 class="text-lg font-bold text-[var(--sand)] font-display">Planora</h2>
-                </div>
-                <p class="font-mono text-[0.6rem] tracking-wider text-[rgba(246,237,224,0.4)] uppercase ml-0.5">Admin Panel</p>
-            </div>
-            
-            <nav class="space-y-1 flex-1 px-3">
-                <a href="/admin/hotels" class="sidebar-link active flex items-center gap-3 px-3 py-2.5 rounded-lg">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
-                    </svg>
-                    <span class="text-sm font-medium">Hotels</span>
-                </a>
-                <a href="/admin/users" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                    </svg>
-                    <span class="text-sm font-medium">Users</span>
-                </a>
-            </nav>
-            
-            <div class="p-3 mt-auto">
-                <div class="pt-3 border-t border-[rgba(246,237,224,0.08)]">
-                    <form action="/logout" method="POST">
-                        @csrf
-                        <button type="submit" class="sidebar-link w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
-                            </svg>
-                            <span class="text-sm font-medium">Logout</span>
-                        </button>
-                    </form>
-                </div>
-            </div>
-        </aside>
+</style>
+@endpush
 
-        <!-- Mobile Overlay -->
-        <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-30 hidden lg:hidden" onclick="toggleSidebar()"></div>
-
-        <!-- Main Content -->
-        <main class="flex-1 p-4 lg:p-8 min-h-screen">
-            <!-- Mobile Header -->
-            <div class="lg:hidden flex items-center justify-between mb-8">
-                <button onclick="toggleSidebar()" class="mobile-menu-btn hidden p-2.5 rounded-lg hover:bg-[var(--sand-deep)]">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-                    </svg>
-                </button>
-                <div class="flex items-center gap-2.5">
-                    <span class="brand-mark" style="background:var(--deep-teal);color:white;display:inline-flex;width:32px;height:32px;font-size:0.875rem;">⌁</span>
-                    <span class="text-lg font-bold text-[var(--deep-teal)] font-display">Planora</span>
-                </div>
-            </div>
-
-            <!-- Header -->
+@section('content')
+<!-- Header -->
             <header class="mb-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div>
                     <h1 class="font-display text-3xl lg:text-4xl font-bold text-[var(--deep-teal)] mb-1">Hotel Management</h1>
@@ -566,6 +575,8 @@
                 </button>
             </header>
             
+<div class="bg-[var(--card)] border border-[var(--line)] rounded-xl shadow-sm overflow-hidden">
+
             <!-- Hotels Table -->
             <!-- Toolbar -->
             <div class="p-4 lg:p-5 border-b border-[var(--line)]">
@@ -611,114 +622,145 @@
                     </div>
                 </div>
                 
-                <!-- Table -->
-                <div>
-                    <table class="hotel-table">
-                        <thead>
-                            <tr>
-                                <th class="w-20">Image</th>
-                                <th class="min-w-[240px]">Hotel Name</th>
-                                <th class="w-28">Price</th>
-                                <th class="w-24">Rating</th>
-                                <th class="w-32">Updated</th>
-                                <th class="w-24 text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="hotelsTableBody">
-                            @if($hotels->count() > 0)
-                                @foreach($hotels as $hotel)
-                                <tr class="animate-slide-in" style="animation-delay: {{ $loop->index * 0.03 }}s">
-                                    <td>
-                                        @if($hotel->image_url)
-                                        <img src="{{ $hotel->image_url }}" alt="{{ $hotel->name }}" class="hotel-thumbnail" onerror="this.style.display='none'">
-                                        @else
-                                        <div class="hotel-thumbnail-placeholder">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                            </svg>
-                                        </div>
-                                        @endif
-                                    </td>
-                                    <td>
-                                        <div class="flex flex-col gap-0.5">
-                                            <span class="font-semibold text-[var(--ink)] text-sm">{{ $hotel->name }}</span>
-                                            @if($hotel->description)
-                                            <span class="text-xs text-[var(--sage)] line-clamp-1">{{ Str::limit($hotel->description, 50) }}</span>
-                                            @endif
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <span class="font-mono text-sm font-semibold text-[var(--ink)]">{{ $hotel->price !== null && $hotel->price !== '' ? '₱' . number_format((float) str_replace([',', '₱', ' '], '', $hotel->price), 2) : 'N/A' }}</span>
-                                    </td>
-                                    <td>
-                                        <span class="font-mono text-sm font-semibold text-[var(--ink)]">{{ $hotel->rating !== null ? number_format((float) $hotel->rating, 1) : 'N/A' }}</span>
-                                    </td>
-                                    <td>
-                                        <span class="text-sm text-[var(--sage)]">{{ $hotel->updated_at?->format('M d, Y') ?? 'N/A' }}</span>
-                                    </td>
-                                    <td>
-                                        <div class="flex items-center justify-end gap-2">
-                                            <div class="dropdown">
-                                                <button onclick="toggleDropdown(event, 'dropdown-{{ $hotel->id }}')" class="btn-ghost p-2 rounded-lg hover:bg-[var(--sand-deep)]">
-                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
-                                                    </svg>
-                                                </button>
-                                                <div id="dropdown-{{ $hotel->id }}" class="dropdown-menu">
-        <div class="dropdown-item" onclick="viewHotel({{ $hotel->id }})">
-                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                                                        </svg>
-                                                        <span>View</span>
-                                                    </div>
-        <div class="dropdown-item" onclick="editHotel({{ $hotel->id }})">
-                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                                                        </svg>
-                                                        <span>Edit</span>
-                                                    </div>
-                                                    <div class="dropdown-divider"></div>
-        <div class="dropdown-item text-ember-deep" onclick="confirmDelete({{ $hotel->id }})">
-                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                                        </svg>
-                                                        <span>Delete</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                </tr>
-                                @endforeach
-                            @else
-                                <tr>
-                                    <td colspan="5">
-                                        <div class="text-center py-16 px-4">
-                                            <div class="mx-auto w-20 h-20 mb-4 rounded-full bg-[var(--sand-deep)] flex items-center justify-center">
-                                                <svg class="w-10 h-10 text-[var(--sage)] opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
-                                                </svg>
-                                            </div>
-                                            <p class="font-display text-xl font-semibold text-[var(--ink)] mb-2">No hotels found</p>
-                                            <p class="text-sm text-[var(--sage)] mb-6 max-w-sm mx-auto">Get started by adding your first hotel listing to the system.</p>
-                                            <button onclick="openModal()" class="btn-primary px-6 py-2.5 rounded-lg font-semibold text-sm inline-flex items-center gap-2">
-                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                                                </svg>
-                                                Add First Hotel
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            @endif
-                        </tbody>
-                    </table>
+                <!-- Hotel Cards Grid -->
+                <div id="hotelsGrid" class="hotel-grid p-4 lg:p-5">
+                    @if($hotels->count() > 0)
+                        @foreach($hotels as $hotel)
+                        @php
+                            $amenityList = collect(explode(',', (string) $hotel->amenities))
+                                ->map(fn ($amenity) => trim($amenity))
+                                ->filter()
+                                ->values();
+                            $starCount = max(0, min(5, (int) round(((float) ($hotel->rating ?? 0)) / 2)));
+                            $searchBlob = mb_strtolower(implode(' ', array_filter([
+                                $hotel->name,
+                                $hotel->description,
+                                $hotel->address,
+                                $hotel->amenities,
+                            ])), 'UTF-8');
+                        @endphp
+                        <article
+                            class="hotel-card animate-slide-in"
+                            data-hotel-card
+                            data-search="{{ $searchBlob }}"
+                            style="animation-delay: {{ $loop->index * 0.03 }}s"
+                        >
+                            <!-- Cover -->
+                            <div class="hotel-card-cover">
+                                @if($hotel->image_url)
+                                <img src="{{ $hotel->image_url }}" alt="{{ $hotel->name }}" loading="lazy" onerror="this.style.display='none'">
+                                @else
+                                <div class="hotel-card-cover-empty">
+                                    <svg class="w-9 h-9" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                    </svg>
+                                </div>
+                                @endif
+                                <span class="hotel-card-badge">
+                                    <svg class="w-3.5 h-3.5" style="color: var(--ember);" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M10 15.27L16.18 19l-1.64-7.03L20 7.24l-7.19-.61L10 0 7.19 6.63 0 7.24l5.46 4.73L3.82 19z"></path>
+                                    </svg>
+                                    {{ $hotel->rating !== null ? number_format((float) $hotel->rating, 1) : 'N/A' }}
+                                </span>
+                            </div>
+
+                            <!-- Body -->
+                            <div class="hotel-card-body">
+                                <h3 class="hotel-card-title mb-1">{{ $hotel->name }}</h3>
+
+                                <div class="flex items-center gap-1.5 mb-2.5">
+                                    <span class="hotel-card-stars" aria-hidden="true">{{ str_repeat('★', $starCount) ?: '☆' }}</span>
+                                    <span class="font-mono text-xs font-semibold text-[var(--ink-soft)]">
+                                        {{ $hotel->rating !== null ? number_format((float) $hotel->rating, 1) . ' / 10' : 'Unrated' }}
+                                    </span>
+                                </div>
+
+                                <p class="hotel-card-price mb-3">
+                                    {{ $hotel->price !== null && $hotel->price !== '' ? '₱' . number_format((float) $hotel->price, 2) . ' / night' : 'Rate unavailable' }}
+                                </p>
+
+                                @if($hotel->description)
+                                <p class="text-sm text-[var(--ink-soft)] leading-relaxed line-clamp-2 mb-3">{{ $hotel->description }}</p>
+                                @endif
+
+                                @if($amenityList->isNotEmpty())
+                                <div class="flex flex-wrap gap-1.5 mb-3">
+                                    @foreach($amenityList->take(3) as $amenity)
+                                    <span class="hotel-chip">{{ $amenity }}</span>
+                                    @endforeach
+                                    @if($amenityList->count() > 3)
+                                    <span class="hotel-chip" style="background: rgba(217,98,43,0.1); color: var(--ember-deep);">+{{ $amenityList->count() - 3 }} more</span>
+                                    @endif
+                                </div>
+                                @endif
+                                <div class="text-xs text-[var(--sage)] space-y-1 mb-1">
+                                    @if($hotel->address)
+                                    <p class="flex items-start gap-1.5 line-clamp-2">
+                                        <svg class="w-3.5 h-3.5 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                        </svg>
+                                        <span>{{ $hotel->address }}</span>
+                                    </p>
+                                    @endif
+                                    <p class="font-mono">Updated {{ $hotel->updated_at?->format('M d, Y') ?? 'N/A' }}</p>
+                                </div>
+
+                                <!-- Actions -->
+                                <div class="hotel-card-actions">
+                                    <button type="button" onclick="viewHotel({{ $hotel->id }})" class="btn-secondary flex-1 px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center justify-center gap-1.5">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                        </svg>
+                                        View
+                                    </button>
+                                    <button type="button" onclick="editHotel({{ $hotel->id }})" class="btn-primary flex-1 px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center justify-center gap-1.5">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                        </svg>
+                                        Edit
+                                    </button>
+                                    <button type="button" onclick="confirmDelete({{ $hotel->id }})" class="btn-danger px-2.5 py-2 rounded-lg inline-flex items-center justify-center" aria-label="Delete {{ $hotel->name }}" title="Delete hotel">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </article>
+                        @endforeach
+                    @else
+                        <div class="hotel-card-empty bg-[var(--card)] border border-[var(--line)] rounded-xl">
+                            <div class="text-center py-16 px-4">
+                                <div class="mx-auto w-20 h-20 mb-4 rounded-full bg-[var(--sand-deep)] flex items-center justify-center">
+                                    <svg class="w-10 h-10 text-[var(--sage)] opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                                    </svg>
+                                </div>
+                                <p class="font-display text-xl font-semibold text-[var(--ink)] mb-2">No hotels found</p>
+                                <p class="text-sm text-[var(--sage)] mb-6 max-w-sm mx-auto">Get started by adding your first hotel listing to the system.</p>
+                                <button onclick="openModal()" class="btn-primary px-6 py-2.5 rounded-lg font-semibold text-sm inline-flex items-center gap-2">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                    </svg>
+                                    Add First Hotel
+                                </button>
+                            </div>
+                        </div>
+                    @endif
                 </div>
-        </main>
-    </div>
-    
-    <!-- Add/Edit Hotel Modal -->
+
+                @if($hotels->hasPages())
+                <div class="p-4 border-t border-[var(--line)] bg-[var(--sand)]">
+                    {{ $hotels->links() }}
+                </div>
+                @endif
+            </div>
+@endsection
+
+@section('modals')
+<!-- Add/Edit Hotel Modal -->
     <div id="hotelModal" class="modal">
         <div class="modal-box">
             <div class="p-6 border-b border-[var(--line)]">
@@ -945,9 +987,11 @@
         @method('DELETE')
     </form>
     @endforeach
+@endsection
 
-    <script>
-        // Hotel data for modals
+@push('scripts')
+<script>
+// Hotel data for modals
         const hotelsData = @json($hotels->items());
         let currentHotelId = null;
 
@@ -1017,7 +1061,7 @@
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <p class="text-xs font-mono uppercase tracking-wider text-[var(--sage)] font-semibold mb-1">Price</p>
-                            <p class="text-sm font-mono font-semibold text-[var(--ink)]">${hotel.price ? '₱' + parseFloat(String(hotel.price).replace(/[₱,\s]/g, '')).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) : 'N/A'}</p>
+                            <p class="text-sm font-mono font-semibold text-[var(--ink)]">${hotel.price ? '₱' + Number(hotel.price).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) : 'N/A'}</p>
                         </div>
                         <div>
                             <p class="text-xs font-mono uppercase tracking-wider text-[var(--sage)] font-semibold mb-1">Rating</p>
@@ -1112,19 +1156,17 @@
 
         // Search functionality
         const searchInput = document.getElementById('searchInput');
+        const hotelCards = Array.from(document.querySelectorAll('#hotelsGrid [data-hotel-card]'));
+
         searchInput.addEventListener('input', function(e) {
-            const searchTerm = e.target.value.toLowerCase();
-            const rows = document.querySelectorAll('#hotelsTableBody tr');
+            const searchTerm = e.target.value.trim().toLowerCase();
             let visibleCount = 0;
 
-            rows.forEach(row => {
-                const text = row.textContent.toLowerCase();
-                if (text.includes(searchTerm)) {
-                    row.style.display = '';
-                    visibleCount++;
-                } else {
-                    row.style.display = 'none';
-                }
+            hotelCards.forEach(card => {
+                const haystack = (card.dataset.search || card.textContent).toLowerCase();
+                const matches = haystack.includes(searchTerm);
+                card.style.display = matches ? '' : 'none';
+                if (matches) visibleCount++;
             });
 
             document.getElementById('resultsCount').textContent = visibleCount;
@@ -1133,11 +1175,10 @@
 
         function clearFilters() {
             searchInput.value = '';
-            const rows = document.querySelectorAll('#hotelsTableBody tr');
-            rows.forEach(row => {
-                row.style.display = '';
+            hotelCards.forEach(card => {
+                card.style.display = '';
             });
-            document.getElementById('resultsCount').textContent = @json($hotels->count());
+            document.getElementById('resultsCount').textContent = hotelCards.length;
             document.getElementById('clearFilters').classList.add('hidden');
         }
 
@@ -1251,6 +1292,5 @@
                 }
             });
         });
-    </script>
-</body>
-</html>
+</script>
+@endpush

@@ -35,10 +35,19 @@ return [
 
     'groq' => [
         'key' => env('GROQ_API_KEY'),
+        'model' => env('GROQ_MODEL', 'qwen/qwen3.8-27b'),
+        'timeout' => (int) env('GROQ_TIMEOUT', 25),
+        'temperature' => (float) env('GROQ_TEMPERATURE', 0.2),
     ],
 
     'openweather' => [
         'key' => env('OPENWEATHER_API_KEY'),
+    ],
+
+    'nominatim' => [
+        // Appended to a hotel name when geocoding so results stay inside the
+        // planned city. Applied exactly once by GeocodeHotels::geocode().
+        'suffix' => env('NOMINATIM_LOCATION_SUFFIX', ', Dagupan City, Pangasinan, Philippines'),
     ],
 
 ];

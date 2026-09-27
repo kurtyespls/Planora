@@ -9,6 +9,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="stylesheet" href="/css/planora-design.css">
     <style>
         .top-nav {
@@ -196,12 +198,12 @@
         }
     </style>
 </head>
-<body class="min-h-screen px-4 pb-8 md:px-8" x-data="{ activeTab: 'profile', showProfilePanel: false }">
+<body class="min-h-screen px-4 pb-8 md:px-8" x-data="{ activeTab: '{{ request()->query('tab') === 'plans' ? 'plans' : 'profile' }}', showProfilePanel: false }">
     
     <!-- Top Navigation Bar -->
     <nav class="top-nav">
         <div class="top-nav-inner">
-            <a href="/planora" class="brand"><span class="brand-mark">⌁</span><span>planora</span></a>
+            <a href="/planora" class="brand"><span class="brand-mark">⌁<img src="/images/planora-logo-sm.png" alt="" class="brand-logo" onerror="this.remove()"></span><span>planora</span></a>
             <div class="flex items-center gap-3">
                 <a href="/planora" class="top-nav-link">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
@@ -276,16 +278,25 @@
                 </button>
             </div>
             
+            <!-- Flash messages live above the tabs so a redirect back from a
+                 plan delete or a profile save is visible on either tab. -->
+            @if(session('success'))
+            <div class="mb-5 p-4 rounded-xl flex items-center gap-2" style="background:#ECFDF5;border:1px solid #A7F3D0;color:#065F46;font-size:0.85rem;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01 5 7.01"/></svg>
+                {{ session('success') }}
+            </div>
+            @endif
+
+            @if(session('error'))
+            <div class="mb-5 p-4 rounded-xl flex items-center gap-2" style="background:#FEF2F2;border:1px solid #FECACA;color:#991B1B;font-size:0.85rem;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                {{ session('error') }}
+            </div>
+            @endif
+
             <!-- Profile Tab -->
             <div x-show="activeTab === 'profile'" x-cloak class="tab-content">
                 @if(auth()->id() === $user->id)
-                    @if(session('success'))
-                    <div class="mb-5 p-4 rounded-xl flex items-center gap-2" style="background:#ECFDF5;border:1px solid #A7F3D0;color:#065F46;font-size:0.85rem;">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01 5 7.01"/></svg>
-                        {{ session('success') }}
-                    </div>
-                    @endif
-
                     @if ($errors->any())
                     <div class="mb-5 p-4 rounded-xl" style="background:#FEF2F2;border:1px solid #FECACA;color:#991B1B;font-size:0.85rem;">
                         <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
@@ -422,8 +433,19 @@
                     @foreach($user->plans->sortByDesc('created_at') as $plan)
                     <div class="plan-card p-5">
                         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                            <div class="flex-1 min-w-0">
-                                <h3 class="font-display font-semibold text-lg text-[var(--ink)] mb-2">{{ $plan->hotel_name }}</h3>
+                            <div class="flex-1 min-w-0" x-data="{ renaming: false, draft: @js($plan->title ?? '') }">
+                                <div class="flex items-center gap-2 mb-2" x-show="!renaming">
+                                    <h3 class="font-display font-semibold text-lg text-[var(--ink)]">{{ $plan->display_title }}</h3>
+                                    <button type="button" @click="renaming = true" class="text-xs font-semibold text-[var(--sage)] hover:text-[var(--deep-teal)] underline whitespace-nowrap">Rename</button>
+                                </div>
+                                <form x-show="renaming" x-cloak action="/plans/{{ $plan->id }}" method="POST" class="flex items-center gap-2 mb-2">
+                                    @csrf
+                                    @method('PATCH')
+                                    <input type="hidden" name="return" value="profile">
+                                    <input type="text" name="title" x-model="draft" maxlength="120" placeholder="{{ $plan->hotel_name }}" class="field py-2 text-sm">
+                                    <button type="submit" class="btn-primary px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap" style="width:auto;">Save</button>
+                                    <button type="button" @click="renaming = false" class="btn-ghost px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap">Cancel</button>
+                                </form>
                                 <div class="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-[var(--ink-soft)]">
                                     <span class="flex items-center gap-1.5">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -437,12 +459,24 @@
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
                                         {{ $plan->created_at->format('M d, Y') }}
                                     </span>
+                                    <span class="plan-badge">{{ $plan->ai_provider === 'groq' ? 'AI generated' : 'Offline generator' }}</span>
                                 </div>
                             </div>
-                            <button onclick="viewPlan('{{ $plan->id }}')" class="btn-primary px-5 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 whitespace-nowrap" style="width:auto;">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
-                                View
-                            </button>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <button onclick="viewPlan('{{ $plan->id }}')" class="btn-primary px-5 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 whitespace-nowrap" style="width:auto;">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                                        View
+                                    </button>
+                                    <form action="/plans/{{ $plan->id }}/regenerate" method="POST">
+                                        @csrf
+                                        <button type="submit" class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap" @disabled(!$aiEnabled) title="{{ $aiEnabled ? 'Build a fresh version of this itinerary' : 'Add a GROQ_API_KEY to enable AI regeneration' }}">Regenerate</button>
+                                    </form>
+                                    <form action="/plans/{{ $plan->id }}" method="POST" onsubmit="return confirm('Delete this plan? This cannot be undone.')">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn-danger px-4 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap">Delete</button>
+                                    </form>
+                                </div>
                         </div>
                     </div>
                     @endforeach
@@ -454,7 +488,7 @@
     
     <script>
         function viewPlan(planId) {
-            showToast('Plan details coming soon!', 'info', 3000);
+            window.location.href = `/plans/${planId}`;
         }
         
         function showToast(message, type = 'info', duration = 4000) {

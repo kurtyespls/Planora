@@ -1,0 +1,218 @@
+:root { --sidebar-width: 260px; }
+body {
+    background-color: var(--sand);
+    background-image:
+        radial-gradient(circle at 10% 10%, rgba(11,61,58,0.04) 0%, transparent 45%),
+        radial-gradient(circle at 95% 90%, rgba(217,98,43,0.03) 0%, transparent 40%);
+    color: var(--ink);
+    min-height: 100vh;
+}
+.admin-sidebar {
+    width: var(--sidebar-width);
+    background: linear-gradient(180deg, var(--deep-teal) 0%, #072624 100%);
+    box-shadow: 4px 0 24px rgba(11,61,58,0.12);
+    position: fixed;
+    top: 0; bottom: 0; left: 0;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.admin-main-wrap {
+    margin-left: var(--sidebar-width);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    transition: margin-left 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@media (max-width: 1024px) {
+    .admin-sidebar { transform: translateX(-100%); }
+    .admin-sidebar.open { transform: translateX(0); }
+    .admin-main-wrap { margin-left: 0 !important; }
+}
+.sidebar-link {
+    position: relative;
+    color: rgba(246, 237, 224, 0.7);
+    transition: all 0.2s ease;
+    border-radius: var(--radius-sm);
+    padding: 0.65rem 0.85rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+.sidebar-link::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 50%;
+    transform: translateY(-50%);
+    width: 3px; height: 0;
+    background: var(--ember);
+    border-radius: 0 3px 3px 0;
+    transition: height 0.25s ease;
+}
+.sidebar-link:hover {
+    color: var(--sand);
+    background: rgba(246, 237, 224, 0.08);
+    transform: translateX(3px);
+}
+.sidebar-link.active {
+    color: var(--sand);
+    background: rgba(246, 237, 224, 0.12);
+    font-weight: 600;
+}
+.sidebar-link.active::before,
+.sidebar-link:hover::before { height: 60%; }
+.admin-topbar {
+    background: rgba(246, 237, 224, 0.88);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--line);
+    position: sticky;
+    top: 0;
+    z-index: 30;
+}
+.stat-card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    padding: 1.25rem 1.5rem;
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    overflow: hidden;
+    transition: all 0.25s ease;
+}
+.stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.stat-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--deep-teal);
+}
+.stat-card.stat-ember::after { background: var(--ember); }
+.stat-card.stat-sage::after { background: var(--sage); }
+
+.btn-primary {
+    background: var(--deep-teal);
+    color: var(--sand);
+    border: 0;
+    box-shadow: 0 4px 12px rgba(11,61,58,0.18);
+    transition: all 0.25s ease;
+    border-radius: var(--radius-sm);
+}
+.btn-primary:hover:not(:disabled) {
+    background: var(--deep-teal-ink);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(11,61,58,0.25);
+}
+.btn-secondary {
+    background: var(--card);
+    color: var(--deep-teal);
+    border: 1.5px solid var(--line);
+    transition: all 0.2s ease;
+    border-radius: var(--radius-sm);
+}
+.btn-secondary:hover {
+    border-color: var(--deep-teal);
+    background: var(--sand);
+    transform: translateY(-1px);
+}
+.btn-danger {
+    background: transparent;
+    color: var(--ember-deep);
+    border: 1.5px solid var(--ember-deep);
+    transition: all 0.2s ease;
+    border-radius: var(--radius-sm);
+}
+.btn-danger:hover {
+    background: var(--ember-deep);
+    color: var(--sand);
+    transform: translateY(-1px);
+}
+.field {
+    background: var(--card);
+    border: 1.5px solid var(--line);
+    color: var(--ink);
+    border-radius: var(--radius-sm);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.field:focus {
+    border-color: var(--deep-teal);
+    box-shadow: 0 0 0 3px rgba(11,61,58,0.08);
+    outline: none;
+}
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.725rem;
+    font-weight: 600;
+}
+.badge-admin {
+    background: rgba(11,61,58,0.1);
+    color: var(--deep-teal);
+    border: 1px solid rgba(11,61,58,0.2);
+}
+.badge-user {
+    background: rgba(124,145,135,0.15);
+    color: #3b5046;
+    border: 1px solid rgba(124,145,135,0.25);
+}
+.admin-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+.admin-table thead th {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--sage);
+    font-weight: 700;
+    background: var(--sand-deep);
+    border-bottom: 1px solid var(--line);
+    padding: 0.85rem 1rem;
+    text-align: left;
+    white-space: nowrap;
+}
+.admin-table tbody tr {
+    border-bottom: 1px solid rgba(226, 216, 196, 0.6);
+    transition: background 0.15s ease;
+}
+.admin-table tbody tr:hover { background: rgba(11,61,58,0.025); }
+.admin-table td { padding: 0.85rem 1rem; vertical-align: middle; }
+
+.modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(11,61,58,0.45);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.25s ease;
+    padding: 1rem;
+}
+.modal.active { opacity: 1; visibility: visible; }
+.modal-box {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    max-width: 600px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: var(--shadow-lg);
+    transform: scale(0.96) translateY(8px);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.modal.active .modal-box { transform: scale(1) translateY(0); }

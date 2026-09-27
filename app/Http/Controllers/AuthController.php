@@ -174,7 +174,12 @@ class AuthController extends Controller
 
         try {
             $user = User::with('plans')->findOrFail($id);
-            return view('profile.show', compact('user'));
+            return view('profile.show', [
+                'user' => $user,
+                // Drives the Regenerate button: disabled when no AI model is
+                // configured, so it never silently produces the same itinerary.
+                'aiEnabled' => (bool) config('services.groq.key'),
+            ]);
         } catch (\Exception $e) {
             Log::error('Failed to load profile', [
                 'message' => $e->getMessage(),

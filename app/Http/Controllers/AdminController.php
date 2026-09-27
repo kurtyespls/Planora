@@ -22,6 +22,11 @@ class AdminController extends Controller
         return view('admin.users', compact('users', 'adminCount', 'userCount'));
     }
 
+    public function showUser($id) {
+        $user = User::withCount('plans')->findOrFail($id);
+        return view('admin.user-detail', compact('user'));
+    }
+
     public function destroyUser($id) {
         // Prevent admin from deleting themselves
         if (auth()->id() == $id) {
@@ -52,7 +57,7 @@ class AdminController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'image_url' => 'required|string|max:2048',
-            'price' => 'required|string|max:50',
+            'price' => 'required|numeric|min:0|max:99999999',
             'rating' => 'nullable|numeric|min:0|max:10',
             'description' => 'nullable|string',
             'lat' => 'nullable|numeric|between:-90,90',
@@ -61,9 +66,6 @@ class AdminController extends Controller
             'amenities' => 'nullable|string',
             'gallery' => 'nullable|string',
         ]);
-
-        // Normalize price: strip currency symbols, commas and spaces so "₱2,800" becomes "2800"
-        $validated['price'] = preg_replace('/[^0-9.]/', '', $validated['price']);
 
         try {
             Hotel::create($validated);
@@ -90,7 +92,7 @@ class AdminController extends Controller
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
                 'image_url' => 'required|string|max:2048',
-                'price' => 'required|string|max:50',
+                'price' => 'required|numeric|min:0|max:99999999',
                 'rating' => 'nullable|numeric|min:0|max:10',
                 'description' => 'nullable|string',
                 'lat' => 'nullable|numeric|between:-90,90',
@@ -99,9 +101,6 @@ class AdminController extends Controller
                 'amenities' => 'nullable|string',
                 'gallery' => 'nullable|string',
             ]);
-
-            // Normalize price: strip currency symbols, commas and spaces so "₱2,800" becomes "2800"
-            $validated['price'] = preg_replace('/[^0-9.]/', '', $validated['price']);
 
             $hotel->update($validated);
             CacheService::clearHotelsCache();
