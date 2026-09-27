@@ -207,9 +207,10 @@
                     <button type="button" onclick="detectLocationAndRoute()" id="btn-detect-route-show" class="text-xs font-semibold px-3 py-1.5 rounded-lg border border-[var(--line)] hover:bg-[var(--sand-deep)] text-[var(--deep-teal)] transition flex items-center gap-1.5">
                         <span>📍 Route from my location</span>
                     </button>
-                    <a id="show-google-maps-link" href="https://www.google.com/maps/dir/?api=1&destination={{ (float) $hotel->lat }},{{ (float) $hotel->lon }}" target="_blank" rel="noopener noreferrer" class="btn-primary text-xs font-semibold px-3 py-1.5 rounded-lg" style="width:auto;">
-                        Navigate ↗
-                    </a>
+                    <span id="tracking-status-show" class="text-xs font-semibold" style="display:none;color:var(--ember-deep);">● LIVE</span>
+                    <button type="button" onclick="toggleShowTracking()" id="btn-toggle-tracking-show" class="text-xs font-semibold px-3 py-1.5 rounded-lg border border-[var(--line)] hover:bg-[var(--sand-deep)] text-[var(--deep-teal)] transition flex items-center gap-1.5">
+                        Start live tracking
+                    </button>
                 </div>
             </div>
 
@@ -249,7 +250,7 @@
         Planora · Itinerary Systems Desk · Dagupan City
     </footer>
 
-    <script type="application/json" id="plan-markdown">@json($plan->ai_recommendation ?? '')</script>
+    <script type="application/json" id="plan-markdown">@json($plan->ai_recommendation_display ?? '')</script>
 
     <script>
         const planMarkdown = JSON.parse(document.getElementById('plan-markdown').textContent || '""');
@@ -336,6 +337,15 @@
         let showRouteControl = null;
         let showUserMarker = null;
 
+        // —— Realtime tracking state ——
+        // Kaparehong throttle rule sa planner page: isang watchPosition lang ang
+        // bukas, at hindi kada metro ang re-route (OSRM rate limit + battery).
+        let showWatchId = null;
+        let showLastRoutedPoint = null;
+        let showLastRoutedAt = null;
+        const REROUTE_MIN_MOVE_KM = 0.12;   // ~120 m na galaw bago mag-recompute
+        const REROUTE_MAX_AGE_MS = 25000;   // o 25s na pagitan — alinman ang mauna
+
         if (mapEl && window.L) {
             const lat = parseFloat(mapEl.dataset.lat);
             const lon = parseFloat(mapEl.dataset.lon);
@@ -386,17 +396,190 @@
             return `Road route unavailable · straight-line <strong>${km.toFixed(1)} km</strong> · est. <strong>~${duration}</strong> to ${hotelName}`;
         }
 
+        // —— Realtime tracking + route drawing ——
+        function needsReroute(lat, lon, lastPoint, lastAt, now) {
+            if (!lastPoint || !lastAt) return true;
+            if (haversineKm(lastPoint.lat, lastPoint.lon, lat, lon) >= REROUTE_MIN_MOVE_KM) return true;
+
+            return (now - lastAt) >= REROUTE_MAX_AGE_MS;
+        }
+
+        // Isang 'U' pin lang: i-move lang kapag mayroon na.
+        function applyShowUserMarker(uLat, uLon) {
+            const userIcon = L.divIcon({
+                className: '',
+                html: `<div class="map-pin pin-user pin-user-pulse" title="Your GPS Location">
+                    <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:white;display:block;transform:rotate(-45deg);filter:drop-shadow(0 1px 2px rgba(0,0,0,0.25));">
+                        <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
+                    </svg>
+                </div>`,
+                iconSize: [38, 38],
+                iconAnchor: [19, 19],
+                popupAnchor: [0, -19]
+            });
+
+            if (showUserMarker) {
+                showUserMarker.setLatLng([uLat, uLon]);
+            } else {
+                showUserMarker = L.marker([uLat, uLon], { icon: userIcon })
+                    .addTo(showMapInstance)
+                    .bindPopup('<b>You are here</b><br>Live GPS location');
+            }
+        }
+
+        // Ang OSRM route + info panel. `fit: false` kapag live tracking para hindi
+        // lumalaban ang camera kada update.
+        function drawShowRoute(uLat, uLon, options = {}) {
+            const hLat = parseFloat(mapEl.dataset.lat);
+            const hLon = parseFloat(mapEl.dataset.lon);
+            const hotelName = mapEl.dataset.name;
+            const infoEl = document.getElementById('show-route-info');
+            const shouldFit = !options || options.fit !== false;
+
+            if (showRouteControl) {
+                showMapInstance.removeControl(showRouteControl);
+            }
+
+            if (window.L && L.Routing) {
+                // Watchdog: kung walang sagot ang router sa loob ng 15s,
+                // straight-line na tantya na ang ipakita.
+                const fallbackTimer = setTimeout(() => {
+                    if (infoEl) {
+                        infoEl.innerHTML = describeFallbackRoute(uLat, uLon, hLat, hLon, hotelName);
+                    }
+                }, 15000);
+
+                showRouteControl = L.Routing.control({
+                    waypoints: [L.latLng(uLat, uLon), L.latLng(hLat, hLon)],
+                    routeWhileDragging: false,
+                    addWaypoints: false,
+                    show: false,
+                    createMarker: () => null,
+                    lineOptions: {
+                        styles: [
+                            { color: '#0B3D3A', opacity: 0.9, weight: 6 },
+                            { color: '#D9622B', opacity: 0.5, weight: 10 }
+                        ],
+                        addWaypoints: false
+                    }
+                }).addTo(showMapInstance);
+
+                showRouteControl.on('routesfound', (e) => {
+                    const r = e.routes && e.routes[0];
+                    if (r && infoEl) {
+                        clearTimeout(fallbackTimer);
+                        const km = (r.summary.totalDistance / 1000).toFixed(1);
+                        const totalSec = r.summary.totalTime;
+                        const hrs = Math.floor(totalSec / 3600);
+                        const mins = Math.round((totalSec % 3600) / 60);
+                        const duration = hrs > 0 ? `${hrs} hr ${mins} mins` : `${mins} mins`;
+                        infoEl.innerHTML = `Route found: <strong>${km} km</strong> · Approx driving time <strong>~${duration}</strong> to ${hotelName}`;
+                    }
+                });
+
+                showRouteControl.on('routingerror', (err) => {
+                    console.warn('Routing failed:', err && err.error);
+                    clearTimeout(fallbackTimer);
+                    if (infoEl) {
+                        infoEl.innerHTML = describeFallbackRoute(uLat, uLon, hLat, hLon, hotelName);
+                    }
+                });
+            }
+
+            if (shouldFit) {
+                const bounds = L.latLngBounds([[uLat, uLon], [hLat, hLon]]);
+                showMapInstance.fitBounds(bounds, { padding: [50, 50] });
+            }
+        }
+
+        function startShowTracking() {
+            if (!navigator.geolocation || showWatchId !== null) return;
+
+            const infoEl = document.getElementById('show-route-info');
+            if (infoEl && !showLastRoutedPoint) {
+                infoEl.classList.remove('hidden');
+                infoEl.innerText = 'Live tracking — updating as you move…';
+            }
+
+            showWatchId = navigator.geolocation.watchPosition(
+                onShowPosition,
+                onShowPositionError,
+                { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
+            );
+            setShowTrackingState(true);
+        }
+
+        function stopShowTracking() {
+            if (showWatchId !== null && navigator.geolocation) {
+                navigator.geolocation.clearWatch(showWatchId);
+            }
+
+            showWatchId = null;
+            showLastRoutedPoint = null;
+            showLastRoutedAt = null;
+            setShowTrackingState(false);
+        }
+
+        function toggleShowTracking() {
+            if (showWatchId === null) {
+                startShowTracking();
+                if (showWatchId !== null) {
+                    showToast('Live tracking on — the pin follows you.');
+                }
+            } else {
+                stopShowTracking();
+                showToast('Live tracking stopped.');
+            }
+        }
+
+        function setShowTrackingState(tracking) {
+            const badge = document.getElementById('tracking-status-show');
+            const btn = document.getElementById('btn-toggle-tracking-show');
+
+            // Inline style para hindi umasa sa specificity ng utility classes.
+            if (badge) badge.style.display = tracking ? '' : 'none';
+            if (btn) btn.innerText = tracking ? 'Stop live tracking' : 'Start live tracking';
+        }
+
+        function onShowPosition(position) {
+            if (!showMapInstance || !mapEl) return;
+
+            const uLat = position.coords.latitude;
+            const uLon = position.coords.longitude;
+
+            applyShowUserMarker(uLat, uLon);
+
+            const now = Date.now();
+
+            if (needsReroute(uLat, uLon, showLastRoutedPoint, showLastRoutedAt, now)) {
+                showLastRoutedPoint = { lat: uLat, lon: uLon };
+                showLastRoutedAt = now;
+                drawShowRoute(uLat, uLon, { fit: false });
+            }
+
+            if (!showMapInstance.getBounds().contains([uLat, uLon])) {
+                showMapInstance.panTo([uLat, uLon], { animate: true, duration: 0.8 });
+            }
+        }
+
+        function onShowPositionError(err) {
+            console.warn('Live tracking error:', err.message);
+
+            const infoEl = document.getElementById('show-route-info');
+            if (infoEl && !showLastRoutedPoint) {
+                infoEl.innerHTML = `Could not get your location (${err.message}). Enable location access to see the driving route from where you are.`;
+            }
+
+            stopShowTracking();
+        }
+
         function detectLocationAndRoute() {
             if (!navigator.geolocation || !showMapInstance || !mapEl) {
                 alert('Geolocation is not supported by your browser.');
                 return;
             }
 
-            const hLat = parseFloat(mapEl.dataset.lat);
-            const hLon = parseFloat(mapEl.dataset.lon);
-            const hotelName = mapEl.dataset.name;
             const infoEl = document.getElementById('show-route-info');
-            const navLink = document.getElementById('show-google-maps-link');
 
             if (infoEl) {
                 infoEl.classList.remove('hidden');
@@ -408,91 +591,34 @@
                     const uLat = pos.coords.latitude;
                     const uLon = pos.coords.longitude;
 
-                    if (navLink) {
-                        navLink.href = `https://www.google.com/maps/dir/?api=1&origin=${uLat},${uLon}&destination=${hLat},${hLon}`;
-                    }
+                    applyShowUserMarker(uLat, uLon);
 
-                    const userIcon = L.divIcon({
-                        className: '',
-                        html: `<div class="map-pin pin-user pin-user-pulse" title="Your GPS Location">
-                            <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:white;display:block;transform:rotate(-45deg);filter:drop-shadow(0 1px 2px rgba(0,0,0,0.25));">
-                                <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
-                            </svg>
-                        </div>`,
-                        iconSize: [38, 38],
-                        iconAnchor: [19, 19],
-                        popupAnchor: [0, -19]
-                    });
+                    showLastRoutedPoint = { lat: uLat, lon: uLon };
+                    showLastRoutedAt = Date.now();
+                    drawShowRoute(uLat, uLon, { fit: true });
 
-                    if (showUserMarker) {
-                        showUserMarker.setLatLng([uLat, uLon]);
-                    } else {
-                        showUserMarker = L.marker([uLat, uLon], { icon: userIcon })
-                            .addTo(showMapInstance)
-                            .bindPopup('<b>You are here</b><br>Detected GPS Location');
-                    }
-
-                    if (showRouteControl) {
-                        showMapInstance.removeControl(showRouteControl);
-                    }
-
-                    if (window.L && L.Routing) {
-                        // Watchdog: kung walang sagot ang router sa loob ng 15s,
-                        // straight-line na tantya na ang ipakita.
-                        const fallbackTimer = setTimeout(() => {
-                            if (infoEl) {
-                                infoEl.innerHTML = describeFallbackRoute(uLat, uLon, hLat, hLon, hotelName);
-                            }
-                        }, 15000);
-
-                        showRouteControl = L.Routing.control({
-                            waypoints: [L.latLng(uLat, uLon), L.latLng(hLat, hLon)],
-                            routeWhileDragging: false,
-                            addWaypoints: false,
-                            show: false,
-                            createMarker: () => null,
-                            lineOptions: {
-                                styles: [
-                                    { color: '#0B3D3A', opacity: 0.9, weight: 6 },
-                                    { color: '#D9622B', opacity: 0.5, weight: 10 }
-                                ],
-                                addWaypoints: false
-                            }
-                        }).addTo(showMapInstance);
-
-                        showRouteControl.on('routesfound', (e) => {
-                            const r = e.routes && e.routes[0];
-                            if (r && infoEl) {
-                                clearTimeout(fallbackTimer);
-                                const km = (r.summary.totalDistance / 1000).toFixed(1);
-                                const totalSec = r.summary.totalTime;
-                                const hrs = Math.floor(totalSec / 3600);
-                                const mins = Math.round((totalSec % 3600) / 60);
-                                const duration = hrs > 0 ? `${hrs} hr ${mins} mins` : `${mins} mins`;
-                                infoEl.innerHTML = `Route found: <strong>${km} km</strong> · Approx driving time <strong>~${duration}</strong> to ${hotelName}`;
-                            }
-                        });
-
-                        showRouteControl.on('routingerror', (err) => {
-                            console.warn('Routing failed:', err && err.error);
-                            clearTimeout(fallbackTimer);
-                            if (infoEl) {
-                                infoEl.innerHTML = describeFallbackRoute(uLat, uLon, hLat, hLon, hotelName);
-                            }
-                        });
-                    }
-
-                    const bounds = L.latLngBounds([[uLat, uLon], [hLat, hLon]]);
-                    showMapInstance.fitBounds(bounds, { padding: [50, 50] });
+                    // Ang traveller mismo ang humingi ng location, kaya sinasabayan
+                    // na natin ito habang gumagalaw (may Stop live tracking naman).
+                    startShowTracking();
                 },
                 (err) => {
                     if (infoEl) {
-                        infoEl.innerHTML = `Could not get your location (${err.message}). You can still tap <strong>Navigate ↗</strong> to open Google Maps.`;
+                        infoEl.innerHTML = `Could not get your location (${err.message}). Enable location access to see the driving route from where you are.`;
                     }
                 },
                 { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
             );
         }
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                stopShowTracking();
+            }
+        });
+
+        window.addEventListener('beforeunload', () => {
+            stopShowTracking();
+        });
     </script>
 </body>
 </html>

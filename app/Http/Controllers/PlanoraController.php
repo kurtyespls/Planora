@@ -53,6 +53,9 @@ class PlanoraController extends Controller
                 // Preset rest windows: isang source of truth para sa UI at sa
                 // validation sa server (ang oras ay pwedeng i-edit ng user).
                 'restWindows' => PlanoraService::REST_WINDOWS,
+                // 12-hour na display ng parehong presets para sa UI chips; ang
+                // data-start/data-end ay nananatiling 'HH:MM'.
+                'restWindowDisplay' => PlanoraService::restWindowDisplay(),
             ]);
         }
         return view('welcome');

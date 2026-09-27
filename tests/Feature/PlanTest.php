@@ -112,9 +112,10 @@ class PlanTest extends TestCase
 
         $plan = Plan::where('user_id', $user->id)->latest('id')->first();
 
+        // Ang storage ay 'HH:MM' pa rin; 12-hour lang ang display label.
         $this->assertSame(['14:00-16:00', '22:00-06:00'], $plan->rest_days);
         $this->assertSame(
-            ['14:00–16:00 (2h)', '22:00–06:00 (8h)'],
+            ['2:00 PM–4:00 PM (2h)', '10:00 PM–6:00 AM (8h)'],
             $plan->rest_schedule_labels
         );
     }

@@ -9,13 +9,9 @@ use Illuminate\Database\Seeder;
  * Dagupan City beaches and tourist spots. Safe to re-run — matched by name.
  *
  * Categories reuse the vocabulary of PlanoraService::categorizePlaces()
- * (restaurant / mall / beach / tourist) so seeded data and live Overpass
- * results can be merged without translating between two sets of names.
+ * (beach / tourist) so seeded data and live Overpass results merge cleanly.
  *
- * Coordinates come from the Wikivoyage Dagupan listings, cross-checked against
- * OpenStreetMap; the city plaza is placed directly opposite the cathedral it
- * faces. budgetPerDay is a rough peso estimate for entrance fees, cottages
- * and local transport for one person.
+ * Coordinates are verified against OpenStreetMap / Nominatim.
  */
 class TouristSpotSeeder extends Seeder
 {
@@ -26,54 +22,54 @@ class TouristSpotSeeder extends Seeder
                 [
                     'name' => 'Tondaligan Blue Beach',
                     'location' => 'Tondaligan Beach Baywalk, Bonuan Gueset, Dagupan City',
+                    'latitude' => 16.0910556,
+                    'longitude' => 120.3571739,
+                    'rating' => 8.8,
+                    'icon' => '🏖️',
+                    'budgetPerDay' => 100,
+                    'description' => "Dagupan's premier public beach along the Lingayen Gulf, featuring the scenic Tondaligan Baywalk, open sheds, bike paths, and sunset dining stalls.",
+                ],
+                [
+                    'name' => 'Tondaligan Beach Park',
+                    'location' => 'Tondaligan Road, Bonuan Gueset, Dagupan City',
                     'latitude' => 16.0816860,
                     'longitude' => 120.3424465,
-                    'rating' => 8.7,
-                    'icon' => '🏖️',
+                    'rating' => 8.6,
+                    'icon' => '🌴',
                     'budgetPerDay' => 50,
-                    'description' => "Dagupan's main public beach on the Lingayen Gulf, with a baywalk, food stalls and picnic sheds. Best at sunrise and in the late afternoon.",
+                    'description' => 'The landscaped recreational park section of Tondaligan with pine-lined paths, children’s play areas, and picnic facilities by the beach.',
                 ],
                 [
                     'name' => 'Bonuan Beach',
-                    'location' => 'Bonuan, Dagupan City',
-                    'latitude' => 16.0913100,
-                    'longitude' => 120.3571800,
+                    'location' => 'Blue Beach Subdivision, Bonuan Gueset, Dagupan City',
+                    'latitude' => 16.0805201,
+                    'longitude' => 120.3466718,
                     'rating' => 8.3,
                     'icon' => '🌊',
                     'budgetPerDay' => 50,
-                    'description' => 'Quieter stretch of grey-sand shoreline north of Tondaligan, lined with resorts and seafood grills facing the gulf.',
-                ],
-                [
-                    'name' => "Tondaligan People's Park",
-                    'location' => 'Bonuan Gueset, Dagupan City',
-                    'latitude' => 16.0810000,
-                    'longitude' => 120.3430000,
-                    'rating' => 8.1,
-                    'icon' => '🎡',
-                    'budgetPerDay' => 30,
-                    'description' => 'Open park and event grounds inside the Tondaligan complex, used for city celebrations and weekend family picnics by the sea.',
+                    'description' => 'Historical grey-sand beach stretch in Bonuan, famous for fresh seafood shacks, morning seaside breezes, and local beach resorts.',
                 ],
             ],
             Location::CATEGORY_TOURIST => [
                 [
                     'name' => 'Metropolitan Cathedral Parish of St. John the Evangelist',
-                    'location' => 'Burgos Street, Downtown District, Dagupan City',
+                    'location' => 'Burgos Street corner Jovellanos Street, Poblacion Oeste, Dagupan City',
                     'latitude' => 16.0422402,
                     'longitude' => 120.3344039,
-                    'rating' => 8.8,
+                    'rating' => 8.9,
                     'icon' => '⛪',
                     'budgetPerDay' => 0,
-                    'description' => 'Dagupan Cathedral, one of two seats of the Archdiocese of Lingayen-Dagupan. The modernist church replaced the Spanish-era building that was damaged in the 1990 earthquake. Feast day is 27 December.',
+                    'description' => 'Historic Dagupan Cathedral and seat of the Archdiocese of Lingayen-Dagupan. A majestic religious and cultural landmark facing the city plaza.',
                 ],
                 [
                     'name' => 'Dagupan City Museum',
-                    'location' => 'A.B. Fernandez Avenue, Downtown District, Dagupan City',
-                    'latitude' => 16.0433300,
-                    'longitude' => 120.3342000,
-                    'rating' => 8.2,
+                    'location' => 'A.B. Fernandez Avenue, Pantal Centro, Dagupan City',
+                    'latitude' => 16.0433315,
+                    'longitude' => 120.3341370,
+                    'rating' => 8.3,
                     'icon' => '🏛️',
                     'budgetPerDay' => 50,
-                    'description' => "Small city museum along A.B. Fernandez Avenue covering Dagupan's history, from the old Kaboloan polity and the railway era to the bangus industry. A vintage railway car sits out front.",
+                    'description' => "City museum showcasing Dagupan's rich history, antique memorabilia, railway heritage with a vintage train car out front, and the world-renowned bangus industry.",
                 ],
                 [
                     'name' => 'Magsaysay Fish Market and Landing Center',
@@ -86,24 +82,54 @@ class TouristSpotSeeder extends Seeder
                     'description' => 'The working heart of the bangus trade — watch milkfish and other catch come off the boats at the landing centre, best very early in the morning.',
                 ],
                 [
-                    'name' => 'Dagupan City Plaza',
-                    'location' => 'Burgos Street corner A.B. Fernandez Avenue, Downtown District, Dagupan City',
-                    'latitude' => 16.0422000,
-                    'longitude' => 120.3346000,
+                    'name' => 'Filipino-Japanese Friendship Garden',
+                    'location' => 'Bonuan Boquig, Dagupan City',
+                    'latitude' => 16.0856475,
+                    'longitude' => 120.3500062,
+                    'rating' => 8.1,
+                    'icon' => '⛩️',
+                    'budgetPerDay' => 30,
+                    'description' => 'Peace memorial park and serene garden along Bonuan honoring post-WWII reconciliation and bilateral friendship between the Philippines and Japan.',
+                ],
+                [
+                    'name' => 'MacArthur Park Bonuan',
+                    'location' => 'Bonuan Gueset, Dagupan City',
+                    'latitude' => 16.0761615,
+                    'longitude' => 120.3347796,
+                    'rating' => 8.2,
+                    'icon' => '🎖️',
+                    'budgetPerDay' => 0,
+                    'description' => 'Historic coastal park commemorating General Douglas MacArthur and Allied liberation forces landing along the Lingayen Gulf shores in January 1945.',
+                ],
+                [
+                    'name' => 'Dawel River Cruise',
+                    'location' => 'Dawel River, Brgy. Pantal / Lomboy, Dagupan City',
+                    'latitude' => 16.0600591,
+                    'longitude' => 120.3394103,
+                    'rating' => 8.5,
+                    'icon' => '🚤',
+                    'budgetPerDay' => 250,
+                    'description' => 'Scenic river cruise traversing the calm waters of the Dawel and Pantal rivers, passing through lush mangrove ecosystems and traditional milkfish fish pens.',
+                ],
+                [
+                    'name' => 'Dagupan City Plaza & Heritage Park',
+                    'location' => 'A.B. Fernandez Avenue corner Burgos Street, Downtown, Dagupan City',
+                    'latitude' => 16.0431813,
+                    'longitude' => 120.3341895,
                     'rating' => 8.0,
                     'icon' => '🏞️',
                     'budgetPerDay' => 0,
-                    'description' => "The city's central plaza right in front of the cathedral. Busy with evening food stalls, and the venue for the nightly events of the Dagupan City Fiesta every December.",
+                    'description' => 'The vibrant civic and cultural center of the city, bustling with fountains, evening street-food kiosks, and city festival gatherings.',
                 ],
                 [
-                    'name' => 'Japanese-Philippine Garden Park',
-                    'location' => 'Tondaligan, Bonuan Gueset, Dagupan City',
-                    'latitude' => 16.0856000,
-                    'longitude' => 120.3500700,
-                    'rating' => 7.8,
-                    'icon' => '🌳',
+                    'name' => 'Saints Peter and Paul Parish Church Calasiao',
+                    'location' => 'Poblacion West, Calasiao (Adjacent to Dagupan)',
+                    'latitude' => 16.0102954,
+                    'longitude' => 120.3569211,
+                    'rating' => 9.0,
+                    'icon' => '⛪',
                     'budgetPerDay' => 0,
-                    'description' => 'Memorial stele and small plaza along the Tondaligan shoreline, marking the friendship between Japan and the Philippines.',
+                    'description' => 'Declared a National Cultural Treasure of the Philippines. A magnificent 16th-century Spanish colonial Baroque church renowned for its historic bell tower and nearby Calasiao Puto stalls.',
                 ],
             ],
         ];

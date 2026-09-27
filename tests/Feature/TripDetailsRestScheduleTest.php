@@ -32,6 +32,10 @@ class TripDetailsRestScheduleTest extends TestCase
         // Ang native na time inputs ang pinagmulan ng oras.
         $response->assertSee('type="time"', false);
 
+        // Ang live summary ay 12-hour kahit 'HH:MM' ang value ng inputs.
+        $response->assertSee('function formatClockTime(', false);
+        $response->assertSee('formatClockTime(start)', false);
+
         // Wala nang fixed na checkbox chips.
         $response->assertDontSee('rest-checkbox', false);
     }
@@ -49,6 +53,14 @@ class TripDetailsRestScheduleTest extends TestCase
             $response->assertSee('data-start="' . $window[0] . '"', false);
             $response->assertSee('data-end="' . $window[1] . '"', false);
         }
+
+        // Ang nakikita ng traveller ay 12-hour; ang data attributes ay 'HH:MM' pa rin.
+        foreach (PlanoraService::restWindowDisplay() as $label => $window) {
+            $response->assertSee($window[0] . ' — ' . $window[1], false);
+        }
+
+        $response->assertSee('aria-label="Morning preset, 8:00 AM to 12:00 PM"', false);
+        $response->assertDontSee('08:00 — 12:00', false);
 
         // Ang dating chronotype label ay pinalitan na ng literal na window.
         $response->assertSee('Evening', false);

@@ -65,4 +65,13 @@ class Plan extends Model
 
         return $labels;
     }
+
+    /**
+     * Ang itinerary ay 12-hour sa display, kasama ang mga lumang naka-save na
+     * plano na 24-hour pa ang oras mula sa AI.
+     */
+    public function getAiRecommendationDisplayAttribute(): ?string
+    {
+        return PlanoraService::toTwelveHourClock($this->ai_recommendation);
+    }
 }

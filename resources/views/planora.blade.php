@@ -663,14 +663,19 @@
                 <!-- Quick fill: pinupuno lang ang oras sa ibaba at pwedeng i-edit agad -->
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3" role="group" aria-labelledby="rest-schedule-label">
                     @foreach(($restWindows ?? []) as $restLabel => $restWindow)
+                    @php
+                        // 12-hour ang nakikita ng traveller; ang data-start/data-end
+                        // ay nananatiling 'HH:MM' para sa native time inputs.
+                        $restDisplay = $restWindowDisplay[$restLabel] ?? $restWindow;
+                    @endphp
                     <button type="button"
                             class="rest-chip p-3 rounded-xl border-[1.5px] border-[var(--line)] bg-[var(--card)] focus-ring"
                             data-rest-preset
                             data-start="{{ $restWindow[0] }}"
                             data-end="{{ $restWindow[1] }}"
-                            aria-label="{{ $restLabel }} preset, {{ $restWindow[0] }} to {{ $restWindow[1] }}">
+                            aria-label="{{ $restLabel }} preset, {{ $restDisplay[0] }} to {{ $restDisplay[1] }}">
                         <span class="font-semibold text-sm">{{ $restLabel }}</span>
-                        <span class="chip-text-sub text-[0.65rem] text-[var(--ink-soft)] uppercase tracking-wide">{{ $restWindow[0] }} — {{ $restWindow[1] }}</span>
+                        <span class="chip-text-sub text-[0.65rem] text-[var(--ink-soft)] uppercase tracking-wide">{{ $restDisplay[0] }} — {{ $restDisplay[1] }}</span>
                     </button>
                     @endforeach
                 </div>
@@ -697,40 +702,34 @@
 
                 <!-- GPS & Travel Route Banner -->
                 <div id="route-guidance-card" class="hidden mb-3 p-3.5 rounded-xl border border-[var(--line)] bg-[var(--card)] shadow-sm">
-                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div class="flex items-start sm:items-center gap-3">
-                            <div class="w-9 h-9 rounded-full bg-[var(--ember)] flex items-center justify-center text-white font-mono font-bold text-xs shrink-0 shadow-sm">
-                                GPS
-                            </div>
-                            <div>
-                                <div class="text-xs font-bold text-[var(--ink)] flex items-center gap-1.5 flex-wrap">
-                                    <span id="route-guidance-title">Route from your current location</span>
-                                    <span id="route-badge-live" class="inline-block px-1.5 py-0.5 rounded text-[0.62rem] font-mono font-semibold bg-emerald-100 text-emerald-800">LIVE ROUTE</span>
-                                </div>
-                                <div id="route-guidance-details" class="text-xs text-[var(--ink-soft)] font-mono mt-0.5">
-                                    Calculating distance and driving time…
-                                </div>
-                            </div>
+                    <div class="flex items-start sm:items-center gap-3">
+                        <div class="w-9 h-9 rounded-full bg-[var(--ember)] flex items-center justify-center text-white font-mono font-bold text-xs shrink-0 shadow-sm">
+                            GPS
                         </div>
-                        <div class="flex items-center gap-2 shrink-0">
-                            <a id="btn-open-external-maps" href="#" target="_blank" rel="noopener noreferrer" class="btn-primary text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 whitespace-nowrap" style="width:auto;">
-                                <span>Navigate (Google Maps) ↗</span>
-                            </a>
-                            <button type="button" onclick="focusOnHotel()" title="Reset view to hotel basecamp" class="px-2.5 py-2 text-xs rounded-lg border border-[var(--line)] text-[var(--ink-soft)] hover:bg-[var(--sand-deep)] transition">
-                                Hotel
-                            </button>
+                        <div>
+                            <div class="text-xs font-bold text-[var(--ink)] flex items-center gap-1.5 flex-wrap">
+                                <span id="route-guidance-title">Route from your current location</span>
+                                <span id="route-badge-live" class="inline-block px-1.5 py-0.5 rounded text-[0.62rem] font-mono font-semibold bg-emerald-100 text-emerald-800">LIVE ROUTE</span>
+                            </div>
+                            <div id="route-guidance-details" class="text-xs text-[var(--ink-soft)] font-mono mt-0.5">
+                                Calculating distance and driving time…
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 <div id="map" class="mb-2 border border-[var(--line)]"></div>
-                <div class="map-legend mb-6">
-                    <span><span class="legend-dot" style="background:#0B3D3A"></span>Your hotel</span>
-                    <span><span class="legend-dot" style="background:#D9622B"></span>You (current location)</span>
-                    <span><span class="legend-dot" style="background:#C2410C"></span>Restaurants</span>
-                    <span><span class="legend-dot" style="background:#0E5F5A"></span>Malls</span>
-                    <span><span class="legend-dot" style="background:#2E7D32"></span>Tourist spots</span>
-                    <span><span class="legend-dot" style="background:#0891B2"></span>Beaches</span>
+                <div id="map-legend" class="map-legend mb-6">
+                    <span data-legend="hotel"><span class="legend-dot" style="background:#0B3D3A"></span>Your hotel</span>
+                    <span data-legend="user"><span class="legend-dot" style="background:#D9622B"></span>You (current location)</span>
+                    <span id="tracking-status" style="display:none;">
+                        <span class="legend-dot" style="background:#D9622B;box-shadow:0 0 0 4px rgba(217,98,43,0.25);"></span>Live tracking
+                    </span>
+                    <button type="button" id="btn-toggle-tracking" onclick="toggleUserTracking()" class="text-xs font-semibold text-[var(--deep-teal)] hover:text-[var(--ember)] transition">Start live tracking</button>
+                    <span data-legend="restaurant"><span class="legend-dot" style="background:#C2410C"></span>Restaurants</span>
+                    <span data-legend="mall"><span class="legend-dot" style="background:#0E5F5A"></span>Malls</span>
+                    <span data-legend="tourist"><span class="legend-dot" style="background:#2E7D32"></span>Tourist spots</span>
+                    <span data-legend="beach"><span class="legend-dot" style="background:#0891B2"></span>Beaches</span>
                 </div>
 
                 <div id="budget-warning-box" class="budget-warning hidden"></div>
@@ -827,6 +826,11 @@
         let hotelName = '';
         let selectedHotelIdx = null;
         let nearbyPlacesData = [];
+        // Lahat ng POI na may coordinates, mula sa Overpass. Hindi ito agad
+        // naka-pin sa mapa: ang itinerary (AI o offline generator) ang nagsasabi
+        // kung alin lang sa kanila ang totoong sinuggest, at ang
+        // `renderSuggestedPlaces()` lang ang naglalagay ng markers.
+        let nearbyPlacesIndex = [];
         let currentHotelPrice = 0;
         let allHotels = [];
 
@@ -1074,6 +1078,8 @@
         }
 
         function goBackToStep1() {
+            // Wala nang mapa sa Step 1, kaya itigil na ang GPS watch.
+            stopUserTracking();
             document.getElementById('step-2').classList.remove('active');
             document.getElementById('step-1').classList.add('active');
             setActiveStub(1);
@@ -1086,6 +1092,16 @@
 
         function restClockToMinutes(value) {
             return parseInt(value.slice(0, 2), 10) * 60 + parseInt(value.slice(3, 5), 10);
+        }
+
+        // '14:00' → '2:00 PM' para 12-hour ang mga oras na nakikita ng traveller.
+        // Ang inputs at ang API payload ay 'HH:MM' pa rin.
+        function formatClockTime(value) {
+            const hours = parseInt(value.slice(0, 2), 10);
+            const minutes = value.slice(3, 5);
+            const display = hours % 12 === 0 ? 12 : hours % 12;
+
+            return `${display}:${minutes} ${hours >= 12 ? 'PM' : 'AM'}`;
         }
 
         function buildRestRow(start = '', end = '') {
@@ -1193,7 +1209,7 @@
                 const hours = minutes / 60;
                 const duration = hours >= 1 ? `${Number(hours.toFixed(1))}h` : `${minutes}m`;
 
-                return `${start}–${end} (${duration}${endAt <= startAt ? ', overnight' : ''})`;
+                return `${formatClockTime(start)}–${formatClockTime(end)} (${duration}${endAt <= startAt ? ', overnight' : ''})`;
             });
 
             summary.innerText = `Daily rest: ${parts.join('  +  ')}`;
@@ -1224,6 +1240,7 @@
             setActiveStub(3);
             document.getElementById('map').style.display = 'block';
             nearbyPlacesData = [];
+            nearbyPlacesIndex = [];
             initMap();
             showProgress(1);
 
@@ -1260,6 +1277,8 @@
             .then(data => {
                 showProgress(4);
                 renderItinerary(data.recommendation, data);
+                // Sa itinerary lang nakasalalay ang POI pins sa mapa.
+                renderSuggestedPlaces();
                 const warningBox = document.getElementById('budget-warning-box');
                 if (data.budget_warning) {
                     warningBox.innerText = data.budget_warning;
@@ -1277,6 +1296,7 @@
                 } else {
                     showToast(error.message, 'warning', 6000);
                 }
+                stopUserTracking();
                 document.getElementById('step-3').classList.remove('active');
                 document.getElementById('step-2').classList.add('active');
                 setActiveStub(2);
@@ -1445,6 +1465,15 @@
         let userMarker = null;
         let userLocation = null;
 
+        // —— Realtime tracking state ——
+        // Isang watchPosition lang ang bukas sa isang pagkakataon, at throttled
+        // ang re-route para hindi bahain ang public OSRM server at ang battery.
+        let userWatchId = null;
+        let lastRoutedPoint = null;
+        let lastRoutedAt = null;
+        const REROUTE_MIN_MOVE_KM = 0.12;   // ~120 m na galaw bago mag-recompute
+        const REROUTE_MAX_AGE_MS = 25000;   // o 25s na pagitan — alinman ang mauna
+
         // Isang pin lang ang dapat lumabas sa mapa: ang module-scope na `userMarker`
         // ang source of truth, at ang `window.userMarker` ay alias para sa mga
         // legacy caller (Show My Location button).
@@ -1498,6 +1527,10 @@
         }
 
         function initMap() {
+            // Ang dating watch ay kabilang pa sa lumang mapa, kaya itinitigil muna
+            // (nire-recreate ang mapa sa ibaba).
+            stopUserTracking();
+
             if (map) map.remove();
 
             // Ang marker at route ng naunang mapa ay hindi na valid sa bagong mapa.
@@ -1549,11 +1582,7 @@
                 .openPopup();
 
             autoDetectAndRouteToHotel();
-        }
-
-        function focusOnHotel() {
-            if (!map) return;
-            map.flyTo([selectedLat, selectedLon], 15, { duration: 1 });
+            startUserTracking();
         }
 
         function autoDetectAndRouteToHotel() {
@@ -1562,11 +1591,6 @@
             const card = document.getElementById('route-guidance-card');
             const detailsEl = document.getElementById('route-guidance-details');
             const liveBadge = document.getElementById('route-badge-live');
-            const extLink = document.getElementById('btn-open-external-maps');
-
-            if (extLink) {
-                extLink.href = `https://www.google.com/maps/dir/?api=1&destination=${selectedLat},${selectedLon}`;
-            }
 
             navigator.geolocation.getCurrentPosition(
                 (position) => {
@@ -1576,9 +1600,10 @@
 
                     upsertUserMarker(uLat, uLon, `<b>You are here</b><br><span style="font-size:0.78rem;color:var(--ink-soft);">Detected GPS Location</span>`);
 
-                    if (extLink) {
-                        extLink.href = `https://www.google.com/maps/dir/?api=1&origin=${uLat},${uLon}&destination=${selectedLat},${selectedLon}`;
-                    }
+                    // Na-route na ang puntong ito, kaya hindi na ito uulitin ng
+                    // unang watch callback (ito ang throttle baseline).
+                    lastRoutedPoint = { lat: uLat, lon: uLon };
+                    lastRoutedAt = Date.now();
 
                     routeFromUserToHotel(uLat, uLon);
                 },
@@ -1588,7 +1613,7 @@
                     console.log('User location not granted or unavailable:', err.message);
                     if (card && detailsEl) {
                         card.classList.remove('hidden');
-                        detailsEl.innerHTML = 'Location unavailable — allow location access for the live route. You can still use <em>Navigate (Google Maps)</em>.';
+                        detailsEl.innerHTML = 'Location unavailable — allow location access to see the live route from your current position.';
                     }
                     if (liveBadge) liveBadge.classList.add('hidden');
                 },
@@ -1596,7 +1621,112 @@
             );
         }
 
-        function routeFromUserToHotel(fromLat, fromLon) {
+        // —— Realtime tracking ——
+        // Ang dating one-shot getCurrentPosition() ay hindi sumusunod sa gumagalaw
+        // na traveller. Ang watchPosition() ang nagbibigay ng tuloy-tuloy na
+        // updates, pero hindi kada metro ang re-route para hindi mabaha ang OSRM.
+        function needsReroute(lat, lon, lastPoint, lastAt, now) {
+            if (!lastPoint || !lastAt) return true;
+            if (haversineKm(lastPoint.lat, lastPoint.lon, lat, lon) >= REROUTE_MIN_MOVE_KM) return true;
+
+            return (now - lastAt) >= REROUTE_MAX_AGE_MS;
+        }
+
+        function startUserTracking() {
+            if (!navigator.geolocation || userWatchId !== null) return;
+
+            userWatchId = navigator.geolocation.watchPosition(
+                onUserPosition,
+                onUserPositionError,
+                { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
+            );
+            setTrackingState(true);
+        }
+
+        function stopUserTracking() {
+            if (userWatchId !== null && navigator.geolocation) {
+                navigator.geolocation.clearWatch(userWatchId);
+            }
+
+            userWatchId = null;
+            lastRoutedPoint = null;
+            lastRoutedAt = null;
+            setTrackingState(false);
+        }
+
+        function toggleUserTracking() {
+            if (userWatchId === null) {
+                startUserTracking();
+                showToast('Live tracking on — the U pin follows you.', 'success', 3000);
+            } else {
+                stopUserTracking();
+                showToast('Live tracking stopped.', 'info', 3000);
+            }
+        }
+
+        function setTrackingState(tracking) {
+            const badge = document.getElementById('tracking-status');
+            const btn = document.getElementById('btn-toggle-tracking');
+
+            // Inline style ang kailangan: ang `.map-legend span` na
+            // `display: inline-flex` ay mas mataas ang specificity sa `.hidden`.
+            if (badge) badge.style.display = tracking ? '' : 'none';
+            if (btn) btn.innerText = tracking ? 'Stop live tracking' : 'Start live tracking';
+        }
+
+        function onUserPosition(position) {
+            if (!map || !markerLayers) return;
+
+            const uLat = position.coords.latitude;
+            const uLon = position.coords.longitude;
+            userLocation = { lat: uLat, lon: uLon };
+
+            upsertUserMarker(uLat, uLon, `<b>You are here</b><br><span style="font-size:0.78rem;color:var(--ink-soft);">Live GPS location</span>`);
+
+            const now = Date.now();
+
+            if (needsReroute(uLat, uLon, lastRoutedPoint, lastRoutedAt, now)) {
+                lastRoutedPoint = { lat: uLat, lon: uLon };
+                lastRoutedAt = now;
+                routeFromUserToHotel(uLat, uLon, { fit: false });
+            }
+
+            followUserOnMap(uLat, uLon);
+        }
+
+        function onUserPositionError(err) {
+            console.log('Live tracking error:', err.message);
+
+            // Kung wala pang nakuha kahit isang position, ipakita pa rin ang card
+            // na may paliwanag imbes na tahimik na walang feedback.
+            if (!lastRoutedPoint) {
+                const card = document.getElementById('route-guidance-card');
+                const detailsEl = document.getElementById('route-guidance-details');
+                const liveBadge = document.getElementById('route-badge-live');
+
+                if (card && detailsEl) {
+                    card.classList.remove('hidden');
+                    detailsEl.innerHTML = 'Location unavailable — allow location access to see the live route from your current position.';
+                }
+                if (liveBadge) liveBadge.classList.add('hidden');
+            }
+
+            stopUserTracking();
+        }
+
+        // Huwag i-fitBounds() kada update (lumalaban ito sa camera at nakakagulo);
+        // i-pan lang kapag lumabas na ang pin sa nakikitang bahagi ng mapa.
+        function followUserOnMap(lat, lon) {
+            if (!map) return;
+            if (!map.getBounds().contains([lat, lon])) {
+                map.panTo([lat, lon], { animate: true, duration: 0.8 });
+            }
+        }
+
+        function routeFromUserToHotel(fromLat, fromLon, options = {}) {
+            // Ang re-route habang gumagalaw ay hindi na nagre-frame ng camera.
+            const shouldFit = !options || options.fit !== false;
+
             if (currentRouteControl) {
                 map.removeControl(currentRouteControl);
             }
@@ -1665,11 +1795,13 @@
                 showFallbackEstimate('road route unavailable');
             });
 
-            const bounds = L.latLngBounds([
-                [fromLat, fromLon],
-                [selectedLat, selectedLon]
-            ]);
-            map.fitBounds(bounds, { padding: [60, 60] });
+            if (shouldFit) {
+                const bounds = L.latLngBounds([
+                    [fromLat, fromLon],
+                    [selectedLat, selectedLon]
+                ]);
+                map.fitBounds(bounds, { padding: [60, 60] });
+            }
         }
 
         window.drawRouteTo = function(targetLat, targetLon) {
@@ -1752,14 +1884,119 @@
                                 </div>
                             </div>
                         `;
-                        const marker = L.marker([parseFloat(place.lat), parseFloat(place.lon)], { icon: makeIcon(iconMap[type].label[0], iconMap[type].cls) })
-                            .addTo(markerLayers).bindPopup(popupHTML);
-                        marker.on('popupopen', () => {
-                            loadWeatherIntoPopup(parseFloat(place.lat), parseFloat(place.lon), weatherElId);
+                        // Ang descriptor lang ang itinatabi dito. Marker lang ang
+                        // idadagdag kapag binanggit na ito ng itinerary.
+                        nearbyPlacesIndex.push({
+                            name: place.name,
+                            type: type,
+                            iconLabel: iconMap[type].label[0],
+                            iconClass: iconMap[type].cls,
+                            lat: parseFloat(place.lat),
+                            lon: parseFloat(place.lon),
+                            popupHTML: popupHTML,
+                            weatherElId: weatherElId
                         });
                     });
                 });
             } catch (error) { console.error('Nearby places fetch error:', error); }
+        }
+
+        // —— Itinerary-driven na POI pins ——
+        // Ang mga generic na salitang lumalabas sa halos lahat ng itinerary ay
+        // hindi pwedeng maging batayan kung "sinuggest" ba ang isang lugar.
+        const PLACE_STOPWORDS = new Set([
+            'hotel', 'resort', 'restaurant', 'restaurants', 'mall', 'malls',
+            'beach', 'beaches', 'tourist', 'spot', 'spots', 'city', 'dagupan',
+            'pangasinan', 'barangay', 'inc', 'the', 'and', 'near', 'with'
+        ]);
+
+        // Case-, diacritic- at punctuation-insensitive na paghahambing, para
+        // tumugma ang "SM Center Dagupan" sa itinerary text.
+        function normalizePlaceText(value) {
+            return String(value || '')
+                .toLowerCase()
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                .replace(/&/g, ' and ')
+                .replace(/[^a-z0-9]+/g, ' ')
+                .trim();
+        }
+
+        function itineraryMentionsPlace(name, normalizedItinerary) {
+            const normalizedName = normalizePlaceText(name);
+            if (normalizedName.length < 3) return false;
+
+            // Kapag generic na salita lang ang buong pangalan (hal. "Beach
+            // Resort"), hindi ito matutukoy — mas mabuting huwag mag-pin kaysa
+            // magpakita ng lugar na hindi naman sinuggest.
+            const tokens = normalizedName.split(' ')
+                .filter(token => token.length >= 4 && !PLACE_STOPWORDS.has(token));
+
+            if (tokens.length === 0) return false;
+
+            // Buong pangalan ang nabanggit — ito ang pinaka-tiyak na tugma.
+            if (normalizedItinerary.includes(normalizedName)) return true;
+
+            // Kapag pinaikli o hinati-hati ng itinerary ang pangalan, sapat na
+            // ang mga distinctive na salita (dalawa o higit pa, o isa kung isa
+            // lang naman ito — hal. "Jollibee").
+            const matched = tokens.filter(token => normalizedItinerary.includes(token)).length;
+
+            return tokens.length === 1 ? matched === 1 : matched >= 2;
+        }
+
+        // Ang itinerary text (markdown + naka-render na DOM) ang source of truth,
+        // kaya dito lang naglalagay ng POI markers imbes na sa
+        // fetchNearbyAmenities() — kung ano lang ang sinuggest, iyon lang ang
+        // lalabas sa mapa.
+        function renderSuggestedPlaces() {
+            if (!markerLayers) return 0;
+
+            const outputEl = document.getElementById('ai-output');
+            const itineraryText = normalizePlaceText(`${currentItineraryMarkdown} ${outputEl ? outputEl.textContent : ''}`);
+            if (itineraryText === '') return 0;
+
+            // Ang basecamp ay may sariling 'H' pin na, kaya hindi na ito dapat
+            // maging POI pin.
+            const hotelKey = normalizePlaceText(hotelName);
+
+            const plottedNames = new Set();
+            const plottedTypes = new Set();
+
+            nearbyPlacesIndex.forEach(place => {
+                const key = normalizePlaceText(place.name);
+                if (plottedNames.has(key)) return;
+                if (hotelKey.length >= 3 && (key.includes(hotelKey) || hotelKey.includes(key))) return;
+                if (!itineraryMentionsPlace(place.name, itineraryText)) return;
+
+                plottedNames.add(key);
+                plottedTypes.add(place.type);
+
+                const marker = L.marker([place.lat, place.lon], { icon: makeIcon(place.iconLabel, place.iconClass) })
+                    .addTo(markerLayers).bindPopup(place.popupHTML);
+                marker.on('popupopen', () => {
+                    loadWeatherIntoPopup(place.lat, place.lon, place.weatherElId);
+                });
+            });
+
+            updateLegendVisibility(plottedTypes);
+
+            if (plottedNames.size === 0 && nearbyPlacesIndex.length > 0) {
+                showToast('Your itinerary did not name any nearby spot, so only the hotel and your location are pinned.', 'info', 5000);
+            }
+
+            return plottedNames.size;
+        }
+
+        // Hindi maintindihan ng traveller ang legend entry na walang pin sa mapa.
+        function updateLegendVisibility(plottedTypes) {
+            ['restaurant', 'mall', 'tourist', 'beach'].forEach(type => {
+                const entry = document.querySelector(`[data-legend="${type}"]`);
+                if (!entry) return;
+                // Inline style ang kailangan: ang `.map-legend span` na
+                // `display: inline-flex` ay mas mataas ang specificity sa
+                // Tailwind na `.hidden`.
+                entry.style.display = plottedTypes.has(type) ? '' : 'none';
+            });
         }
 
         function toggleButtonState(buttonId, enable) {
@@ -2070,6 +2307,23 @@
             });
         });
         mapObserver.observe(document.getElementById('map'), { attributes: true, attributeFilter: ['style'] });
+
+        // Sa mobile, humihinto ang GPS updates kapag naka-background ang tab o
+        // naka-lock ang screen — kaya itinitigil natin ang watch at binubuksan
+        // ulit kapag bumalik ang traveller sa Step 3.
+        document.addEventListener('visibilitychange', () => {
+            const stepThree = document.getElementById('step-3');
+            const onStepThree = !!stepThree && stepThree.classList.contains('active');
+
+            if (document.hidden) {
+                stopUserTracking();
+            } else if (onStepThree) {
+                startUserTracking();
+            }
+        });
+
+        // Pag-alis sa page (o reload) ay awtomatikong pinuputol ang watch.
+        window.addEventListener('beforeunload', stopUserTracking);
     </script>
 </body>
 </html>

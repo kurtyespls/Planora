@@ -52,6 +52,19 @@ class PlanoraService
      */
     private const REST_WINDOW_PATTERN = '/^([01]\d|2[0-3]):([0-5]\d)-([01]\d|2[0-3]):([0-5]\d)$/';
 
+    /**
+     * Ang AI ay madaling mag-24-hour kahit 12-hour ang hinihingi, kaya ang
+     * natitirang 'HH:MM' na HINDI sinusundan ng AM/PM ang kinokonberte (tingnan
+     * ang toTwelveHourClock()). Ang negative lookahead ang nagpoprotekta sa mga
+     * 12-hour na oras na galing na sa AI o sa local generator ('3:30 PM').
+     */
+    private const CLOCK_24H_PATTERN = '/\b([01]?\d|2[0-3]):([0-5]\d)\b(?!\s*[AaPp]\.?[Mm]\.?)/';
+
+    /**
+     * Isinisingit sa prompt para 12-hour ang isulat ng AI.
+     */
+    public const AI_TIME_FORMAT_RULE = 'Write EVERY time in 12-hour clock with AM/PM (e.g. 8:00 AM, 2:30 PM, 6:15 PM). NEVER use 24-hour times like 14:00 or 18:30.';
+
     public static function nightsFor(int $days): int
     {
         return max(0, $days - self::NIGHTS_PER_DAY_OFFSET);
@@ -141,7 +154,7 @@ class PlanoraService
 
     /**
      * Human-readable na label para sa isang naka-save na entry: legacy label
-     * kung label, o "14:00–16:00 (2h)" kung window.
+     * kung label, o "2:00 PM–4:00 PM (2h)" kung window.
      */
     public static function restEntryLabel(string $entry): string
     {
@@ -157,10 +170,34 @@ class PlanoraService
             return $entry;
         }
 
+        // Ang buong araw (00:00–23:59) ay 'Whole Day' pa rin ang label —
+        // kaparehong rule sa normalizeRestSchedule().
+        if ($window['start'] === '00:00' && $window['end'] === '23:59') {
+            return 'Whole Day';
+        }
+
         $hours = $window['minutes'] / 60;
         $duration = $hours >= 1 ? round($hours, 1) . 'h' : $window['minutes'] . 'm';
 
-        return $window['start'] . '–' . $window['end'] . ' (' . $duration . ')';
+        // 12-hour ang display kahit 24-hour ang naka-save ('14:00-16:00').
+        return self::clockLabel($window['start']) . '–' . self::clockLabel($window['end']) . ' (' . $duration . ')';
+    }
+
+    /**
+     * Ang presets ay naka-store bilang 'HH:MM' (para sa native time inputs at sa
+     * validation), kaya hiwalay na display copy ang ibinibigay sa mga UI chip.
+     *
+     * @return array<string, array{0: string, 1: string}>
+     */
+    public static function restWindowDisplay(): array
+    {
+        $display = [];
+
+        foreach (self::REST_WINDOWS as $label => $window) {
+            $display[$label] = [self::clockLabel($window[0]), self::clockLabel($window[1])];
+        }
+
+        return $display;
     }
 
     /**
@@ -305,7 +342,7 @@ class PlanoraService
 
         $restList = $validated['rest_days'] ?? [];
         $wholeRestDayIndex = $this->resolveWholeRestDay($restList, $days);
-        $restInstruction = $this->buildRestInstruction($restList, $wholeRestDayIndex, $days);
+        $restInstruction = self::buildRestInstruction($restList, $wholeRestDayIndex, $days);
 
         // A regeneration arrives without a browser-supplied POI list, so the
         // places are looked up from the hotel coordinates instead.
@@ -342,6 +379,10 @@ class PlanoraService
                 $nearbyPlaces
             );
         }
+
+        // Lahat ng oras na makikita ng traveller ay 12-hour, kahit 24-hour ang
+        // isinulat ng AI. Idempotent ito para sa output ng local generator.
+        $recommendation = self::toTwelveHourClock($recommendation);
 
         return [
             'recommendation' => $recommendation,
@@ -705,11 +746,12 @@ class PlanoraService
             . "\n- Available nearby places: {$poiList}"
             . "\n- Rest schedule: {$restInstruction}"
             . "\n\nFORMATTING & STRUCTURE RULES (STRICT):"
+            . "\n- TIME FORMAT: " . self::AI_TIME_FORMAT_RULE
             . "\n- Use '### Day X' as the heading for each regular day (or '### Full Rest Day' if the whole day is set for rest)."
             . "\n- Under each day, provide EXACTLY 3 to 4 chronological bullet points matching the day's flow:"
-            . "\n    * Morning (approx 08:00–11:30): breakfast / morning activity"
-            . "\n    * Afternoon (approx 13:00–17:00): afternoon spot or hotel downtime (respect rest window!)"
-            . "\n    * Evening / Dinner (approx 18:00–21:00): dinner or light evening stop"
+            . "\n    * Morning (approx 8:00 AM–11:30 AM): breakfast / morning activity"
+            . "\n    * Afternoon (approx 1:00 PM–5:00 PM): afternoon spot or hotel downtime (respect rest window!)"
+            . "\n    * Evening / Dinner (approx 6:00 PM–9:00 PM): dinner or light evening stop"
             . "\n    * Daily cost line: 'Estimated day cost: ~PHP X (Food ~PHP Y, Activities/Transpo ~PHP Z)'"
             . "\n- Respect the traveller's rest schedule: NEVER schedule an outside activity during their chosen rest window. If a rest window falls in that block, explicitly write '- [Time]: Rest at {$data['hotel']}'."
             . "\n- Keep each bullet concise (1–2 sentences) with an approximate time and approximate PHP cost."
@@ -745,7 +787,11 @@ class PlanoraService
         return null;
     }
 
-    private function buildRestInstruction(array $restList, ?int $wholeRestDayIndex, int $days): string
+    /**
+     * Ang rest window ay isinasalin sa 12-hour na oras para sa prompt (para
+     * 12-hour din ang isulat ng AI). Public para direktang matest.
+     */
+    public static function buildRestInstruction(array $restList, ?int $wholeRestDayIndex, int $days): string
     {
         $parts = [];
 
@@ -758,9 +804,13 @@ class PlanoraService
             $hours = $window['minutes'] / 60;
             $duration = $hours >= 1 ? round($hours, 1) . ' hour(s)' : $window['minutes'] . ' minute(s)';
 
+            // 12-hour na oras sa prompt (hal. 2:00 PM to 4:00 PM).
+            $start = self::clockLabel($window['start']);
+            $end = self::clockLabel($window['end']);
+
             $parts[] = $window['overnight']
-                ? "rests overnight from {$window['start']} to {$window['end']} ({$duration}) — schedule no activities inside that window"
-                : "rests daily from {$window['start']} to {$window['end']} ({$duration}) — schedule no activities inside that window";
+                ? "rests overnight from {$start} to {$end} ({$duration}) — schedule no activities inside that window"
+                : "rests daily from {$start} to {$end} ({$duration}) — schedule no activities inside that window";
         }
 
         if ($wholeRestDayIndex !== null) {
@@ -784,14 +834,35 @@ class PlanoraService
 
     /**
      * '14:00' → '2:00 PM' (kaparehong estilo ng dating hardcoded na oras).
+     * Public dahil ito rin ang ginagamit ng UI chips at ng rest labels.
      */
-    private static function clockLabel(string $time): string
+    public static function clockLabel(string $time): string
     {
         $hours = (int) substr($time, 0, 2);
         $minutes = substr($time, 3, 2);
         $display = $hours % 12 === 0 ? 12 : $hours % 12;
 
         return $display . ':' . $minutes . ' ' . ($hours >= 12 ? 'PM' : 'AM');
+    }
+
+    /**
+     * Ang natitirang 24-hour na oras sa isang text ay ginagawang 12-hour. Ang
+     * oras na may AM/PM ay hindi ginalaw, kaya safe itong patakbuhin kahit sa
+     * output ng local generator (idempotent).
+     */
+    public static function toTwelveHourClock(?string $text): ?string
+    {
+        if ($text === null || $text === '') {
+            return $text;
+        }
+
+        return (string) preg_replace_callback(
+            self::CLOCK_24H_PATTERN,
+            static fn (array $matches): string => self::clockLabel(
+                str_pad($matches[1], 2, '0', STR_PAD_LEFT) . ':' . $matches[2]
+            ),
+            $text
+        );
     }
 
     /**
