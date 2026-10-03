@@ -185,6 +185,18 @@
             </div>
             @endif
 
+            @if(!empty($plan->selected_places))
+            <div class="mb-5">
+                <p class="font-mono text-[0.62rem] uppercase tracking-wider text-[var(--sage)] mb-2">Your picks</p>
+                <div class="flex flex-wrap gap-2">
+                    @foreach($plan->selected_places as $placeLabel)
+                    <span class="badge badge-user">{{ $placeLabel }}</span>
+                    @endforeach
+                </div>
+                <p class="font-mono text-[0.62rem] text-[var(--sage)] mt-2">Regenerating keeps these places.</p>
+            </div>
+            @endif
+
             <div class="flex flex-col sm:flex-row sm:flex-wrap gap-3">
                 <a href="/planora" class="btn-primary px-5 py-3 rounded-xl text-sm font-semibold text-center" style="width:auto;">Plan another trip</a>
                 <form action="/plans/{{ $plan->id }}/regenerate" method="POST">

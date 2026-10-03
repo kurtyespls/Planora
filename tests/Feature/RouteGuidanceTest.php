@@ -44,7 +44,7 @@ class RouteGuidanceTest extends TestCase
         ]);
     }
 
-    public function test_step_three_requests_gps_and_routes_to_the_hotel_automatically(): void
+    public function test_the_itinerary_map_requests_gps_and_routes_to_the_hotel_automatically(): void
     {
         $user = User::factory()->create(['role' => 'user']);
 
@@ -67,7 +67,7 @@ class RouteGuidanceTest extends TestCase
         $response->assertSee('map.fitBounds(bounds, { padding: [60, 60] });', false);
     }
 
-    public function test_step_three_route_card_shows_distance_and_eta_without_navigation_shortcuts(): void
+    public function test_the_itinerary_map_route_card_shows_distance_and_eta_without_navigation_shortcuts(): void
     {
         $user = User::factory()->create(['role' => 'user']);
 
@@ -91,7 +91,7 @@ class RouteGuidanceTest extends TestCase
         $response->assertDontSee('Navigate (Google Maps)', false);
     }
 
-    public function test_step_three_map_only_plots_places_named_in_the_itinerary(): void
+    public function test_the_itinerary_map_plots_itinerary_places_and_the_travellers_picks(): void
     {
         $user = User::factory()->create(['role' => 'user']);
 
@@ -111,6 +111,12 @@ class RouteGuidanceTest extends TestCase
         $response->assertSee('renderSuggestedPlaces();', false);
         $response->assertSee('function itineraryMentionsPlace(', false);
         $response->assertSee('PLACE_STOPWORDS', false);
+
+        // Ang mga pinili ng traveller ay pinipin din kahit hindi sila maabot ng
+        // salita sa itinerary — kung hindi, magmumukhang walang epekto ang picker
+        // kapag hindi sinunod ng AI ang isang napili.
+        $response->assertSee('function renderPickedPlaces(', false);
+        $response->assertSee('renderPickedPlaces(data.selected_places', false);
 
         // Ang legend ay may tag sa bawat category, at itinatago ang walang pin.
         $response->assertSee('id="map-legend"', false);

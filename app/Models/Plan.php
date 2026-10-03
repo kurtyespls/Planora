@@ -22,6 +22,7 @@ class Plan extends Model
         'budget',
         'total_days',
         'rest_days',
+        'selected_places',
         'ai_recommendation',
         'ai_provider',
     ];
@@ -33,6 +34,7 @@ class Plan extends Model
      */
     protected $casts = [
         'rest_days' => 'array',
+        'selected_places' => 'array',
         'budget' => 'decimal:2',
         'total_days' => 'integer',
     ];

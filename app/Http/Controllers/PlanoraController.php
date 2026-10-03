@@ -56,6 +56,14 @@ class PlanoraController extends Controller
                 // 12-hour na display ng parehong presets para sa UI chips; ang
                 // data-start/data-end ay nananatiling 'HH:MM'.
                 'restWindowDisplay' => PlanoraService::restWindowDisplay(),
+                // Ang floor ng daily allowance. Ipinapasa ito sa browser gaya ng
+                // nightsOffset para hindi magkaiba ang Estimate ng Step 02 at ang
+                // hard guard ng server — kung hindi, "looks fine" ang Step 02
+                // at "Budget too low" ang resulta pagkatapos.
+                'minDailyAllowance' => PlanoraService::MIN_DAILY_ALLOWANCE,
+                // Ang kiseral ng budget. Walang hangganan ang dating validation,
+                // kaya nakakapasok ang PHP 123,000,000 bago man maisapawan.
+                'maxTripBudget' => PlanoraService::MAX_TRIP_BUDGET,
             ]);
         }
         return view('welcome');
@@ -106,12 +114,7 @@ class PlanoraController extends Controller
     {
         $term = trim((string) $request->query('q', ''));
         $category = trim((string) $request->query('category', ''));
-        $categories = [
-            Location::CATEGORY_RESTAURANT,
-            Location::CATEGORY_MALL,
-            Location::CATEGORY_BEACH,
-            Location::CATEGORY_TOURIST,
-        ];
+        $categories = array_keys(PlanoraService::PLACE_CATEGORY_LABELS);
 
         try {
             $spots = Location::query()
@@ -142,6 +145,37 @@ class PlanoraController extends Controller
                 'q' => $term,
             ]);
             return response()->json(['error' => 'Failed to load tourist spots.'], 500);
+        }
+    }
+
+    /**
+     * Budget-appropriate places for the Step 03 picker.
+     *
+     * Separate from getTouristSpots(): that endpoint backs the check-in flow and
+     * deliberately returns a thin five-field payload, so widening it here would
+     * have meant changing a contract another consumer already depends on.
+     *
+     * The allowance is clamped to >= 0 so a negative query string cannot be used
+     * to make the endpoint behave differently than the picker renders it.
+     */
+    public function getPlaces(Request $request)
+    {
+        $dailyAllowance = max(0.0, (float) $request->query('daily_allowance', 0));
+        $lat = $request->filled('lat') ? (float) $request->query('lat') : null;
+        $lon = $request->filled('lon') ? (float) $request->query('lon') : null;
+
+        try {
+            return response()->json(
+                $this->planoraService->getBudgetFriendlyPlaces($dailyAllowance, $lat, $lon)
+            );
+        } catch (\Exception $e) {
+            Log::error('Error fetching budget-friendly places', [
+                'message' => $e->getMessage(),
+                'user_id' => auth()->id(),
+                'endpoint' => 'getPlaces',
+                'daily_allowance' => $dailyAllowance,
+            ]);
+            return response()->json(['error' => 'Failed to load places.'], 500);
         }
     }
 
@@ -188,7 +222,7 @@ class PlanoraController extends Controller
     {
         $validated = $request->validate([
             'hotel'          => 'required|string|max:255',
-            'budget'         => 'required|numeric|min:1',
+            'budget'         => 'required|numeric|min:1|max:' . PlanoraService::MAX_TRIP_BUDGET,
             'days'           => 'required|integer|min:1|max:30',
             'rest_days'      => 'nullable|array|max:4',
             // Tumatanggap ng preset label ('Morning') O custom na oras na
@@ -206,6 +240,11 @@ class PlanoraController extends Controller
             ],
             'weather_desc'   => 'nullable|string|max:255',
             'nearby_places'  => 'nullable|string',
+            // Ang mga lugar na pinili ng traveller sa Step 03. Malimit ang
+            // haba dahil ang bawat isa ay isang bagay na dapat magpasok ng
+            // itinerary, hindi basta listahan.
+            'selected_places' => 'nullable|array|max:' . PlanoraService::MAX_SELECTED_PLACES,
+            'selected_places.*' => 'string|max:120',
         ]);
 
         try {
@@ -224,6 +263,11 @@ class PlanoraController extends Controller
                 'budget_warning' => $result['budget_warning'],
                 'daily_allowance' => $result['daily_allowance'],
                 'ai_provider' => $result['ai_provider'] ?? 'local',
+                // Ang canonical na labels na natanggap ng server, hindi ang raw
+                // na ipinadala ng browser. Ito ang pinipin ng mapa at ang
+                // nakikita sa itinerary header, kaya ang isang lagyan ng single
+                // source of truth para sa "totoong napili" na lugar.
+                'selected_places' => $result['selected_places'] ?? [],
             ]);
         } catch (\Exception $e) {
             Log::error('Critical Execution Failure in generatePlan', [

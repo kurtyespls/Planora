@@ -36,6 +36,7 @@ Route::get('/api/hotels', [PlanoraController::class, 'getHotels'])->middleware('
 Route::get('/api/nearby-places', [PlanoraController::class, 'getNearbyPlaces'])->middleware('throttle.api:30,1');
 Route::get('/api/weather', [PlanoraController::class, 'getWeather'])->middleware('throttle.api:60,1');
 Route::get('/api/tourist-spots', [PlanoraController::class, 'getTouristSpots'])->middleware('throttle.api:60,1');
+Route::get('/api/places', [PlanoraController::class, 'getPlaces'])->middleware('throttle.api:60,1');
 
 // Authenticated planning, visit-log at plan-view routes.
 // /generate-plan is behind auth because it persists a plan owned by the current

@@ -252,8 +252,11 @@ class PlanTest extends TestCase
             'days' => 1,
         ]);
 
-        $response->assertOk();
-        $this->assertEquals(0, $response->json('nights'));
+        // FIX: ang dating assertion ay `assertEquals(0, $response->json('nights'))`.
+        // Walang 'nights' key sa JSON response — kaya nagtatagotlab ito laban sa
+        // null at kumakapang walang epekto. Ang allowance ang tunay na sukat:
+        // eksaktong 500 ang lumalabas => walang napigil na gabi na binayaran.
+        $response->assertOk()->assertJsonPath('daily_allowance', 500);
     }
 
     public function test_owner_can_rename_their_plan(): void

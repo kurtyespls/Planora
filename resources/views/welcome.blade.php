@@ -415,28 +415,35 @@
                 <div class="text-center mb-10 md:mb-16 reveal">
                     <div class="eyebrow text-center justify-center" style="color:var(--ember-deep);">Simple steps</div>
                     <h2 class="text-3xl sm:text-4xl md:text-5xl font-display text-[var(--deep-teal)] mt-3 mb-4">How it works</h2>
-                    <p class="text-[var(--ink-soft)] max-w-xl mx-auto text-base sm:text-lg">Three clicks and you're on your way to exploring Dagupan like a local.</p>
+                    <p class="text-[var(--ink-soft)] max-w-xl mx-auto text-base sm:text-lg">Four steps from a blank budget to a day-by-day Dagupan plan you actually want.</p>
                 </div>
-                <div class="grid md:grid-cols-3 gap-6 md:gap-12">
+                <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
                     <div class="how-step reveal">
                         <div class="step-number">01</div>
                         <div class="step-content">
-                            <h3 class="font-bold text-lg text-[var(--deep-teal)]">Tell us your style</h3>
-                            <p class="text-sm leading-6 text-[var(--ink-soft)]">Pick your budget, duration, and what excites you — food, history, or beaches.</p>
+                            <h3 class="font-bold text-lg text-[var(--deep-teal)]">Choose your stay</h3>
+                            <p class="text-sm leading-6 text-[var(--ink-soft)]">Pick a hotel from real Dagupan listings — nightly rate, amenities and map location included.</p>
                         </div>
                     </div>
                     <div class="how-step reveal">
                         <div class="step-number">02</div>
                         <div class="step-content">
-                            <h3 class="font-bold text-lg text-[var(--deep-teal)]">Get your itinerary</h3>
-                            <p class="text-sm leading-6 text-[var(--ink-soft)]">Our AI builds a day-by-day plan with hotels, routes, and price estimates.</p>
+                            <h3 class="font-bold text-lg text-[var(--deep-teal)]">Set your details</h3>
+                            <p class="text-sm leading-6 text-[var(--ink-soft)]">How many days, how much budget, and the exact hours you want to rest. You set the pace.</p>
                         </div>
                     </div>
                     <div class="how-step reveal">
                         <div class="step-number">03</div>
                         <div class="step-content">
-                            <h3 class="font-bold text-lg text-[var(--deep-teal)]">Explore with confidence</h3>
-                            <p class="text-sm leading-6 text-[var(--ink-soft)]">View your trip on an interactive map, adjust anytime, and share with friends.</p>
+                            <h3 class="font-bold text-lg text-[var(--deep-teal)]">Pick your places</h3>
+                            <p class="text-sm leading-6 text-[var(--ink-soft)]">Malls, beaches, restaurants and tourist spots — filtered to what your daily budget can actually afford.</p>
+                        </div>
+                    </div>
+                    <div class="how-step reveal">
+                        <div class="step-number">04</div>
+                        <div class="step-content">
+                            <h3 class="font-bold text-lg text-[var(--deep-teal)]">Get your itinerary</h3>
+                            <p class="text-sm leading-6 text-[var(--ink-soft)]">The AI builds your days around the places you chose, then drops it all on an interactive map.</p>
                         </div>
                     </div>
                 </div>

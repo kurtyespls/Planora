@@ -17,7 +17,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" href="/favicon.png">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="stylesheet" href="/css/planora-design.css">
@@ -37,9 +37,18 @@
             --line: #E2D8C4;
         }
 
-        * { font-family: 'Inter', system-ui, sans-serif; }
-        .font-display { font-family: 'Fraunces', Georgia, serif; }
-        .font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+        /* Ang Alpine ay buhat sa CDN na `defer`, kaya kumikislap ang anumang
+           nasa ilalim ng x-show bago pa ito mag-initialize. Wala itong tinatakdang
+           patakaran sa Alpine CDN, kaya kailangan natin itong ideklarar. */
+        [x-cloak] { display: none !important; }
+
+        /* Pareho sa public/css/planora-design.css. Dati ay 'Inter', 'Fraunces'
+           at 'JetBrains Mono' lang na nakalist-a rito, pero wala silang-load sa
+           Google Fonts link sa itaas — kaya palaging system-ui/Courier ang
+           lumalabas kahit may `body` na 'Plus Jakarta Sans' sa design CSS. */
+        * { font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif; }
+        .font-display { font-family: 'DM Serif Display', 'Fraunces', Georgia, serif; }
+        .font-mono { font-family: 'JetBrains Mono', 'Courier New', ui-monospace, monospace; }
 
         body {
             background-color: var(--sand);
@@ -574,10 +583,13 @@
                 <div class="stub-node" id="stub-2" data-step="2">02</div>
                 <div class="stub-line"></div>
                 <div class="stub-node" id="stub-3" data-step="3">03</div>
+                <div class="stub-line"></div>
+                <div class="stub-node" id="stub-4" data-step="4">04</div>
             </div>
             <div class="flex justify-between mt-2 px-1 font-mono text-[0.62rem] uppercase tracking-wider text-[var(--sage)]">
                 <span>Stay</span>
                 <span>Details</span>
+                <span>Places</span>
                 <span>Itinerary</span>
             </div>
         </div>
@@ -648,7 +660,7 @@
                     </div>
                     <div>
                         <label class="block mb-2 font-medium text-sm text-[var(--ink)]">Budget (PHP)</label>
-                        <input type="number" id="trip-budget" class="input-field w-full p-3 rounded-xl font-mono focus-ring" min="1" placeholder="How much your Budget?">
+                        <input type="number" id="trip-budget" class="input-field w-full p-3 rounded-xl font-mono focus-ring" min="1" max="1000000" placeholder="How much your Budget?">
                     </div>
                 </div>
                 <p id="budget-hint" class="text-xs text-[var(--sage)] mb-6 font-mono"></p>
@@ -689,12 +701,64 @@
                     <p id="rest-summary" class="font-mono text-xs text-[var(--sage)]" aria-live="polite"></p>
                 </div>
 
-                <button id="btn-confirm" onclick="confirmPlan()" class="btn-primary focus-ring w-full p-4 rounded-xl font-bold flex justify-center items-center gap-2">
-                    Generate smart itinerary
+                <button id="btn-confirm" onclick="goToPlaces()" class="btn-primary focus-ring w-full p-4 rounded-xl font-bold flex justify-center items-center gap-2">
+                    Pick my places
                 </button>
             </div>
 
+            <!-- ── Step 03: ang mga lugar na gusto ng traveller ── -->
             <div id="step-3" class="step">
+                <button onclick="goBackToStep2()" class="text-sm text-[var(--deep-teal)] font-semibold mb-5 hover:underline flex items-center gap-1 focus-ring rounded">
+                    <span aria-hidden="true">←</span> Back to details
+                </button>
+
+                <div class="flex items-baseline justify-between mb-1 flex-wrap gap-y-1">
+                    <h2 class="font-display text-2xl font-semibold text-[var(--ink)]">Pick your places</h2>
+                    <span class="font-mono text-[0.65rem] uppercase tracking-wider text-[var(--sage)]">Optional</span>
+                </div>
+                <p class="text-sm text-[var(--ink-soft)] mb-2">
+                    Closest to <span id="places-origin" class="font-semibold text-[var(--ember-deep)]">your hotel</span> first, and every one of them costs less than your
+                    <span id="places-allowance" class="font-mono font-bold text-[var(--deep-teal)]">—</span>
+                    daily allowance.
+                </p>
+                <p id="places-sort-note" class="text-xs text-[var(--sage)] font-mono mb-5"></p>
+
+                <div id="places-filters" class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4" role="group" aria-label="Filter places by category"></div>
+
+                <div id="places-status-row" class="mb-4 flex items-center gap-3 flex-wrap">
+                    <p id="places-status" class="text-sm text-[var(--ink-soft)] flex items-center gap-2">
+                        <span class="w-1.5 h-1.5 rounded-full bg-[var(--ember)] pulse-soft"></span>
+                        Finding spots near your hotel that fit your budget…
+                    </p>
+                    <button type="button" id="places-retry" onclick="loadPlaceOptions(true)"
+                            class="hidden text-xs font-semibold text-[var(--deep-teal)] border-[1.5px] border-[var(--line)] rounded-lg px-3 py-1.5 hover:border-[var(--deep-teal)] transition focus-ring">
+                        Try again
+                    </button>
+                </div>
+
+                <div id="places-list" class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[520px] overflow-y-auto pr-2 pb-2"></div>
+
+                <div id="places-empty" class="hidden p-6 rounded-2xl border border-dashed border-[var(--line)] bg-[var(--card)] text-center mb-5">
+                    <p id="places-empty-message" class="text-sm text-[var(--ink-soft)] mb-1"></p>
+                    <p class="text-xs text-[var(--sage)] font-mono">No problem — you can still generate an itinerary and the AI will plan around your hotel.</p>
+                </div>
+
+                <div class="flex items-center justify-between gap-3 mt-5 p-4 rounded-2xl border border-[var(--line)] bg-[var(--card)] flex-wrap">
+                    <p id="places-summary" class="font-mono text-xs text-[var(--sage)]" aria-live="polite">Nothing picked yet.</p>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <button type="button" id="btn-let-ai-decide" onclick="clearPlaceSelection()"
+                                class="text-sm font-semibold text-[var(--deep-teal)] border-[1.5px] border-[var(--line)] rounded-xl px-4 py-2.5 hover:border-[var(--deep-teal)] transition focus-ring">
+                            Let AI decide
+                        </button>
+                        <button type="button" id="btn-generate" onclick="generateItinerary()"
+                                class="btn-primary focus-ring px-5 py-3 rounded-xl font-bold">
+                            Generate itinerary
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="step-4" class="step">
                 <div class="flex items-baseline justify-between mb-4 flex-wrap gap-y-1">
                     <h2 class="font-display text-2xl font-semibold text-[var(--ink)]">Your itinerary</h2>
                     <span class="font-mono text-[0.65rem] uppercase tracking-wider text-[var(--sage)]">Boarding: now</span>
@@ -809,20 +873,46 @@
         </div>
     </div>
 
+    <!-- Hindi nakalagay ang server-side flags sa loob ng JS block, dahil kapag
+         hinango ang Blade file nang walang compilation, ang mga Blade echo ay
+         literal na teksto pa rin para sa JS parser at nasisira ang buong block
+         (hal. "Property assignment expected"). Ang data attributes sa itaas
+         ang may halaga — buong Blade escaping ay nananatili — at `dataset`
+         sa ibaba ang nagbabasa. -->
+    <div id="planner-config"
+         data-authenticated="{{ auth()->check() ? 'true' : 'false' }}"
+         data-nights-offset="{{ $nightsOffset }}"
+         data-ai-enabled="{{ $aiEnabled ? 'true' : 'false' }}"
+         data-min-daily-allowance="{{ $minDailyAllowance ?? 200 }}"
+         data-max-trip-budget="{{ $maxTripBudget ?? 1000000 }}"
+         hidden></div>
+
     <script>
-        const isAuthenticated = {{ auth()->check() ? 'true' : 'false' }};
         // The OpenWeather key used to be printed here, leaking it to every
         // visitor even though nothing read it — weather goes through /api/weather.
+        const plannerConfig = document.getElementById('planner-config').dataset;
+        const isAuthenticated = plannerConfig.authenticated === 'true';
         //
         // Mirrors PlanoraService::NIGHTS_PER_DAY_OFFSET so this page's estimate
         // can never disagree with the server-side budget guard.
-        const NIGHTS_OFFSET = {{ $nightsOffset }};
-        const AI_ENABLED = {{ $aiEnabled ? 'true' : 'false' }};
+        const NIGHTS_OFFSET = Number(plannerConfig.nightsOffset);
+        //
+        // Mirrors PlanoraService::MIN_DAILY_ALLOWANCE so Step 02 blocks a budget
+        // the server would reject, instead of showing a green hint and then
+        // failing on submit.
+        const MIN_DAILY_ALLOWANCE = Number(plannerConfig.minDailyAllowance) || 200;
+        // Mirrors PlanoraService::MAX_TRIP_BUDGET.
+        const MAX_TRIP_BUDGET = Number(plannerConfig.maxTripBudget) || 1000000;
+        const AI_ENABLED = plannerConfig.aiEnabled === 'true';
         let map;
         let markerLayers;
         let currentRouteControl = null;
         let selectedLat = 16.0438;
         let selectedLon = 120.3331;
+        // Tunay ba ang selectedLat/Lon o mga fallback para sa mapa? Ang picker
+        // ay kailangan ito para hindi mag-label ng "pinakamalapit" ang isang listahan
+        // na ayon naman sa rating lang.
+        let selectedHotelGeocoded = false;
         let hotelName = '';
         let selectedHotelIdx = null;
         let nearbyPlacesData = [];
@@ -833,6 +923,45 @@
         let nearbyPlacesIndex = [];
         let currentHotelPrice = 0;
         let allHotels = [];
+
+        // —— Step 03: ang place picker ——
+        // Stay → Details → Places → Itinerary. Ang bilang na ito ang
+        // humahawak sa haba ng .stub-track, kaya hindi na magka-slide ang
+        // 'for' loop sa setActiveStub() kapag may bagong step na idinagdag.
+        const TOTAL_STEPS = 4;
+        // Mga sumasalaminha ng PlanoraService::MAX_SELECTED_PLACES at
+        // ::MAX_SELECTED_PLACES_PER_CATEGORY. Ang picker ay dapat tumayo na
+        // mag-una sa server, hindi ito ang mahilig na pumili ng limitasyon.
+        const MAX_SELECTED_PLACES = 12;
+        const MAX_SELECTED_PER_CATEGORY = 4;
+        // Parehong kategorya, icon at kulay na ginagamit ng map legend sa itaas
+        // at ng fetchNearbyAmenities() — isang vocabulary para sa lahat ng mapa.
+        const PLACE_CATEGORIES = [
+            { key: 'restaurant', label: 'Restaurants', icon: '🍽️', dot: '#C2410C', pin: 'pin-restaurant', letter: 'R' },
+            { key: 'mall', label: 'Malls', icon: '🏬', dot: '#0E5F5A', pin: 'pin-mall', letter: 'M' },
+            { key: 'beach', label: 'Beaches', icon: '🏖️', dot: '#0891B2', pin: 'pin-beach', letter: 'B' },
+            { key: 'tourist', label: 'Tourist spots', icon: '⛰️', dot: '#2E7D32', pin: 'pin-tourist', letter: 'T' },
+        ];
+
+        let activePlaceFilter = 'all';
+        let placeOptions = { within_budget: {}, over_budget: {}, daily_allowance: 0 };
+        let selectedPlaces = [];
+        // Ang "na-load na" na bilang ng picker, bilang kahit anong kategorya ang
+        // nakikita. Kasama ang hotel dahil nag-iiba ito ng ayos ng distansya.
+        let loadedPlacesKey = null;
+
+        // Ang pangalan ng POI ay panlabas na datos (Overpass) at direktang
+        // naka-embed sa popup HTML ng Leaflet. Kailangan itong i-escape para
+        // hindi makapasok ang `<` o `"` at mabawasan ang markup.
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, char => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            })[char]);
+        }
 
         // Prices arrive as decimal values from the API, so this only formats.
         function formatPrice(price) {
@@ -934,6 +1063,20 @@
             }
         }
 
+        // REGRESSION FIX: noong nag-r-restore kami ng dating napiling hotel sa
+        // load, binabaso namin ang sessionStorage at tinatawag ang
+        // selectHotel() — na siyang naglilipat sa Step 02.
+        //
+        // Problema: ang hotel lang ang na-restore. Ang budget, ang bilang ng araw
+        // at ang rest schedule ay wala — kaya napupunta ang traveller sa Step 02
+        // na halos walang laman, walang "#budget-hint", at tuloy sa kanyang
+        // kagustuhan na "nastuck" doon. Kung ginawa namin itong buo, Okay; pero
+        // hindi, kaya ang malinaw at hindi nakakagulat ang pagbalik sa Step 01.
+        //
+        // Ang pag-restore ng buong draft ay isang hiwalay na feature, hindi
+        // bootstrap na dapat nasa landas ng unang bug.
+        sessionStorage.removeItem('planora_selected_idx');
+
         document.addEventListener('DOMContentLoaded', () => {
             fetchHotels();
 
@@ -947,18 +1090,10 @@
             document.getElementById('trip-days').addEventListener('input', debouncedCheck);
             document.getElementById('trip-budget').addEventListener('input', debouncedCheck);
             initRestWindows();
-            if (sessionStorage.getItem('planora_selected_idx') !== null) {
-                const idx = parseInt(sessionStorage.getItem('planora_selected_idx'));
-                if (allHotels[idx]) selectHotel(idx);
-            }
         });
 
-        function preserveHotelSelection(idx) {
-            sessionStorage.setItem('planora_selected_idx', idx);
-        }
-
         function setActiveStub(stepNum) {
-            for (let i = 1; i <= 3; i++) {
+            for (let i = 1; i <= TOTAL_STEPS; i++) {
                 const node = document.getElementById(`stub-${i}`);
                 node.classList.remove('is-active', 'is-done');
                 if (i < stepNum) {
@@ -1030,10 +1165,13 @@
             if (!hotel) return;
             selectedHotelIdx = idx;
             hotelName = hotel.name;
+            // Ang fallback na 16.0438/120.3331 ay para lang sa mapa — kapag
+            // wala pa sa hotel ang tunay na coordinates, ipinapadala pa rin natin
+            // ito kaya hindi natin malalaman kung ang "pinakamalapit" ay totoo.
             selectedLat = hotel.lat || 16.0438;
             selectedLon = hotel.lon || 120.3331;
+            selectedHotelGeocoded = Number.isFinite(Number(hotel.lat)) && Number.isFinite(Number(hotel.lon));
             currentHotelPrice = Number(hotel.price);
-            preserveHotelSelection(idx);
             document.getElementById('display-selected-hotel').innerText = hotel.name;
             const stars = starsFromRating(hotel.rating);
             const ratingText = Number(hotel.rating).toFixed(1) + ' / 10';
@@ -1051,30 +1189,78 @@
         }
 
         function checkBudget() {
-            const days = parseInt(document.getElementById('trip-days').value) || 1;
-            const budget = parseFloat(document.getElementById('trip-budget').value) || 0;
+            // REGRESSION FIX: noong `budget > 0` ang kundisyon ng unang branch,
+            // kaya ang BLANK na budget field ay napapasok sa 'else' — pindutan
+            // bukas, walang "#budget-hint". Ito ang hitsura ng Step 02 pagkatapos
+            // ng refresh, at doon nagsisimula ang pag-aakala ng traveller na
+            // sira ang budget.
+            //
+            // Ang walanglamang input ay hindi katumbas ng "OK ang budget" — ito
+            // ay "hindi pa sagot". Sapat ang isang malinaw na mensahe at
+            // nakasarang pindutan.
+            const daysEl = document.getElementById('trip-days');
+            const budgetEl = document.getElementById('trip-budget');
             const btn = document.getElementById('btn-confirm');
             const hint = document.getElementById('budget-hint');
+
+            const days = parseInt(daysEl.value, 10);
+            const budget = parseFloat(budgetEl.value);
+
+            const hasBudget = Number.isFinite(budget) && budget > 0;
+            // Ang server ay tumatanggap ng 1..30 na integer lamang, kaya huwag
+            // payagang magpadala ng 0, ng 31+, o ng NaN (na serialized bilang
+            // JSON null at tinutuktok ng 'days' => 'required').
+            const hasValidDays = Number.isInteger(days) && days >= 1 && days <= 30;
+
             // Lodging is charged per night, using the same offset the server
             // applies, so this hint can never promise a budget the server rejects.
-            const nights = Math.max(0, days - NIGHTS_OFFSET);
+            const safeDays = hasValidDays ? days : 1;
+            const nights = Math.max(0, safeDays - NIGHTS_OFFSET);
             const totalCost = currentHotelPrice * nights;
             const remaining = budget - totalCost;
-            if (budget < totalCost && budget > 0) {
+
+            if (!hasValidDays) {
+                btn.disabled = true;
+                hint.innerText = 'Enter how many days you are staying (1–30).';
+                hint.className = 'text-xs text-[var(--ember-deep)] mb-6 font-mono';
+            } else if (!hasBudget) {
+                btn.disabled = true;
+                hint.innerText = 'Enter your total budget to see your daily allowance.';
+                hint.className = 'text-xs text-[var(--sage)] mb-6 font-mono';
+            } else if (budget > MAX_TRIP_BUDGET) {
+                // REGRESSION FIX: walang hangganan ang dating validation, kaya
+                // napasok ang PHP 123,000,000. Sa ganung allowance, lahat ng 47
+                // na lugar ay "swak" — kaya walang saysay ang picker.
+                btn.disabled = true;
+                hint.innerText = `That is above the ₱${MAX_TRIP_BUDGET.toLocaleString()} maximum we can plan for — please check the number.`;
+                hint.className = 'text-xs text-[var(--ember-deep)] mb-6 font-mono';
+            } else if (budget < totalCost) {
                 btn.disabled = true;
                 hint.innerText = `Lodging alone costs ₱${totalCost.toLocaleString()} for ${nights} night(s) — increase your budget or shorten your stay.`;
+                hint.className = 'text-xs text-[var(--ember-deep)] mb-6 font-mono';
+            } else if (remaining / safeDays < MIN_DAILY_ALLOWANCE) {
+                // REGRESSION FIX: ang mirror ng MIN_DAILY_ALLOWANCE ng server. Ito
+                // ang sagut sa "PHP 1 lang, gumagana pa" — noon, ang Step 02 ay
+                // OK dahil bayad na sa hotel, at lang dumating ang problema sa
+                // submit. Ang mensahe ay nagsasabi ng eksaktong kulang.
+                const shortfall = totalCost + (MIN_DAILY_ALLOWANCE * safeDays) - budget;
+                btn.disabled = true;
+                hint.innerText = `That leaves about ₱${Math.round(remaining / safeDays).toLocaleString()}/day. `
+                    + `Planora needs at least ₱${MIN_DAILY_ALLOWANCE.toLocaleString()}/day (one meal plus tricycle fares) — `
+                    + `add ₱${Math.ceil(shortfall).toLocaleString()} to your budget, or pick a cheaper stay.`;
                 hint.className = 'text-xs text-[var(--ember-deep)] mb-6 font-mono';
             } else {
                 btn.disabled = false;
                 hint.className = 'text-xs text-[var(--sage)] mb-6 font-mono';
-                if (budget > 0) {
-                    const perDay = days > 0 ? Math.round(remaining / days) : 0;
-                    const nightLabel = nights === 1 ? '1 night' : `${nights} nights`;
-                    hint.innerText = `≈ ₱${perDay.toLocaleString()}/day left for food & activities after ${nightLabel} of lodging.`;
-                } else {
-                    hint.innerText = '';
-                }
+                const perDay = Math.round(remaining / safeDays);
+                const nightLabel = nights === 1 ? '1 night' : `${nights} nights`;
+                hint.innerText = `≈ ₱${perDay.toLocaleString()}/day left for food & activities after ${nightLabel} of lodging.`;
             }
+
+            // Nagbago na ang daily allowance, kaya hindi na tama ang naka-cache na
+            // listahan ng Step 03. Ang susunod na pagpasok doon ay magre-fetch.
+            // Naka-debounce na ito dahil naka-link sa input event.
+            loadedPlacesKey = null;
         }
 
         function goBackToStep1() {
@@ -1083,6 +1269,414 @@
             document.getElementById('step-2').classList.remove('active');
             document.getElementById('step-1').classList.add('active');
             setActiveStub(1);
+        }
+
+        // —— Step 03: ang place picker ——
+        // Ang allowance na ginagamit dito ay ang parehong arithmetic ng
+        // checkBudget() sa itaas, na siya ring ginagamit ng server-side budget
+        // guard. Kaya ang "swak sa budget mo" ng picker ay hindi mapanghahati
+        // sa server pagkatapos.
+        function currentDailyAllowance() {
+            const days = readTripDays() ?? 1;
+            const budget = readTripBudget() ?? 0;
+            const nights = Math.max(0, days - NIGHTS_OFFSET);
+            const remaining = budget - (currentHotelPrice * nights);
+
+            return Math.max(0, remaining / days);
+        }
+
+        function allWithinBudgetPlaces() {
+            const all = [];
+            Object.values(placeOptions.within_budget || {}).forEach(list => (list || []).forEach(p => all.push(p)));
+
+            // Ang bawat kategorya ay naiisa na ayon sa distansya mula sa server,
+            // kaya ang "All" na pinagsama ay kailangang ayusin muli — kung hindi,
+            // unang restaurant, saka mall, saka beach, at hindi ayon sa
+            // "pinakamalapit".
+            if (placeOptions.origin_known) {
+                all.sort((a, b) => (a.distance_km ?? Infinity) - (b.distance_km ?? Infinity));
+            }
+
+            return all;
+        }
+
+        function findPlace(name) {
+            return allWithinBudgetPlaces().find(place => place.name === name) || null;
+        }
+
+        // Ang mga lugar na nakikita sa listahan batay sa kasalukuyang filter.
+        //
+        // REGRESSION FIX: noong may tinatawag na helper dito pero WALANG
+        // nade-definisyon — dahil inalis ko ito sa renderPlaceCards() at
+        // inlineline ko roon, pero nakalimutang i-update ang call site na ito.
+        // Ang ReferenceError ay nahahantul sa catch, na NAGPAPAKISA sa dating
+        // na-load na 47 na lugar at nagpapakita ng "0" sa bawat chip.
+        //
+        // Ibinabalik ito bilang iisang function (hindi i-inline sa isang dako)
+        // dahil dalawang consumer ang nangangailangan nito, at ang mismong
+        // pagkakamali ang naganap dito. Ang pagtiyak: may eksaktong isang
+        // definition at dalawang call site — dapat palaging magkatugma.
+        function visiblePlaces() {
+            const all = allWithinBudgetPlaces();
+            return activePlaceFilter === 'all'
+                ? all
+                : all.filter(place => place.category === activePlaceFilter);
+        }
+
+        // Kabuuang bilang ng katalogo — may kasamang mga hindi umaangkop sa
+        // budget. Ito ang nagpapansin kung walang naka-seed na lugar sa lahat, na
+        // ibang problema sa "wala kang pwedeng puntahan".
+        function catalogueCount() {
+            const count = (group) => Object.values(group || {})
+                .reduce((total, list) => total + (list || []).length, 0);
+
+            return count(placeOptions.within_budget) + count(placeOptions.over_budget);
+        }
+
+        function renderPlaceFilters() {
+            const container = document.getElementById('places-filters');
+            const options = [{ key: 'all', label: 'All', icon: '✨' }].concat(PLACE_CATEGORIES);
+
+            container.innerHTML = options.map(meta => {
+                const active = activePlaceFilter === meta.key;
+                const count = meta.key === 'all'
+                    ? allWithinBudgetPlaces().length
+                    : allWithinBudgetPlaces().filter(p => p.category === meta.key).length;
+
+                return `
+                    <button type="button" class="place-filter ${active ? 'is-active' : ''}"
+                            data-place-filter="${meta.key}" aria-pressed="${active}" ${count === 0 ? 'disabled' : ''}>
+                        <span class="place-filter-label">${meta.icon} ${escapeHtml(meta.label)}</span>
+                        <span class="place-filter-count">${count}</span>
+                    </button>
+                `;
+            }).join('');
+
+            container.querySelectorAll('[data-place-filter]').forEach(button => {
+                button.addEventListener('click', () => {
+                    activePlaceFilter = button.dataset.placeFilter;
+                    renderPlaceFilters();
+                    renderPlaceCards();
+                });
+            });
+        }
+
+        function renderPlaceCards() {
+            const list = document.getElementById('places-list');
+            const places = visiblePlaces();
+            const allowance = Number(placeOptions.daily_allowance) || 0;
+
+            list.innerHTML = places.map(place => {
+                const selected = selectedPlaces.includes(place.name);
+                const meta = PLACE_CATEGORIES.find(c => c.key === place.category) || PLACE_CATEGORIES[3];
+                const share = allowance > 0 ? Math.round((place.budget_per_day / allowance) * 100) : 0;
+                const km = Number(place.distance_km);
+                const distance = Number.isFinite(km)
+                    ? `<span class="font-mono text-[0.65rem] text-[var(--sage)]">${km < 1 ? `${Math.round(km * 1000)}m` : `${km.toFixed(1)}km`}</span>`
+                    : '';
+
+                return `
+                    <button type="button" class="place-card ${selected ? 'is-selected' : ''}"
+                            data-place-name="${escapeHtml(place.name)}" data-place-category="${place.category}"
+                            aria-pressed="${selected}">
+                        <span class="place-card-top">
+                            <span class="place-card-icon" aria-hidden="true">${escapeHtml(place.icon)}</span>
+                            <span class="place-card-title">${escapeHtml(place.name)}</span>
+                            <span class="place-card-check" aria-hidden="true">${selected ? '✓' : ''}</span>
+                        </span>
+                        <span class="place-card-desc">${escapeHtml(place.description)}</span>
+                        <span class="place-card-meta">
+                            <span class="place-card-badge" style="border-color:${meta.dot}22;color:${meta.dot};">
+                                <span class="place-dot" style="background:${meta.dot};"></span>${escapeHtml(meta.label)}
+                            </span>
+                            <span class="font-mono text-xs font-bold text-[var(--deep-teal)]">₱${formatPrice(place.budget_per_day)}/day</span>
+                            <span class="font-mono text-[0.65rem] text-[var(--sage)]">${share}% of allowance</span>
+                            <span class="text-[var(--ink-soft)] text-xs">★ ${Number(place.rating).toFixed(1)}</span>
+                            ${distance}
+                        </span>
+                    </button>
+                `;
+            }).join('');
+
+            list.querySelectorAll('[data-place-name]').forEach(card => {
+                card.addEventListener('click', () => togglePlace(card.dataset.placeName, card.dataset.placeCategory));
+            });
+
+            renderPlaceEmptyState();
+        }
+
+        // Dalawang ibang problema ang 'walang nakikita', at dati ito ang
+        // pareho ang sinasabi. Hindi katumbas ng "wala sa budget mo" ang
+        // "wala pang naka-seed na lugar sa katalogo" — at ang paghahabol ng
+        // "db:seed" na utos sa isang bagay na pera lamang ang problema ay
+        // aktuwal na mapananlamig.
+        function renderPlaceEmptyState() {
+            const emptyEl = document.getElementById('places-empty');
+            const messageEl = document.getElementById('places-empty-message');
+
+            if (!emptyEl || !messageEl) return;
+
+            const visible = visiblePlaces();
+            emptyEl.classList.toggle('hidden', visible.length !== 0);
+            if (visible.length !== 0) return;
+
+            const total = catalogueCount();
+
+            if (total === 0) {
+                messageEl.innerHTML = 'No places are loaded yet — our Dagupan catalogue is empty. '
+                    + 'Run <code class="font-mono">php artisan db:seed</code> to populate it.';
+            } else if (activePlaceFilter !== 'all') {
+                const label = PLACE_CATEGORIES.find(c => c.key === activePlaceFilter)?.label || 'These';
+                messageEl.innerHTML = `No ${escapeHtml(label.toLowerCase())} fit your daily allowance yet. `
+                    + 'There are others in other categories — tap <strong>All</strong> to see them.';
+            } else {
+                const allowance = Number(placeOptions.daily_allowance) || 0;
+                messageEl.innerHTML = `None of our ${total} places cost less than your `
+                    + `₱${formatPrice(Math.round(allowance))}/day. `
+                    + 'Raise your budget or pick a cheaper stay.';
+            }
+        }
+
+        function togglePlace(name, category) {
+            const idx = selectedPlaces.indexOf(name);
+
+            if (idx > -1) {
+                selectedPlaces.splice(idx, 1);
+            } else {
+                if (selectedPlaces.length >= MAX_SELECTED_PLACES) {
+                    showToast(`You can pick up to ${MAX_SELECTED_PLACES} places. Remove one first.`, 'warning');
+                    return;
+                }
+
+                const available = allWithinBudgetPlaces().filter(p => p.category === category).length;
+                const picked = selectedPlaces.filter(n => findPlace(n)?.category === category).length;
+
+                if (picked >= Math.min(MAX_SELECTED_PER_CATEGORY, available)) {
+                    showToast(`Keep it to ${MAX_SELECTED_PER_CATEGORY} per category so every category gets a look in.`, 'warning');
+                    return;
+                }
+
+                selectedPlaces.push(name);
+            }
+
+            renderPlaceCards();
+            updatePlaceSummary();
+        }
+
+        function clearPlaceSelection() {
+            selectedPlaces = [];
+            renderPlaceCards();
+            updatePlaceSummary();
+            showToast('Cleared — the AI will choose for you.', 'info');
+        }
+
+        function updatePlaceSummary() {
+            const summary = document.getElementById('places-summary');
+            const clearBtn = document.getElementById('btn-let-ai-decide');
+
+            if (selectedPlaces.length === 0) {
+                summary.innerText = 'Nothing picked — this step is optional. The AI will choose for you.';
+                summary.className = 'font-mono text-xs text-[var(--sage)]';
+                clearBtn.disabled = true;
+                return;
+            }
+
+            const total = selectedPlaces.reduce((sum, name) => sum + (findPlace(name)?.budget_per_day || 0), 0);
+            const allowance = Number(placeOptions.daily_allowance) || 0;
+            const share = allowance > 0 ? ` (${Math.round((total / allowance) * 100)}% of your allowance)` : '';
+
+            summary.innerText = `${selectedPlaces.length} of ${MAX_SELECTED_PLACES} picked · ₱${formatPrice(total)}/day${share}`;
+            summary.className = 'font-mono text-xs text-[var(--deep-teal)]';
+            clearBtn.disabled = false;
+        }
+
+        function setPlacesStatus(state, html) {
+            const statusEl = document.getElementById('places-status');
+            const retryEl = document.getElementById('places-retry');
+
+            if (statusEl) {
+                statusEl.innerHTML = html;
+                statusEl.classList.remove('hidden');
+            }
+
+            if (retryEl) {
+                retryEl.classList.toggle('hidden', state !== 'error');
+            }
+        }
+
+        async function loadPlaceOptions(force = false) {
+            const allowance = currentDailyAllowance();
+            const sortNoteEl = document.getElementById('places-sort-note');
+
+            // REGRESSION FIX: ang cache key ay dapat kasama ang hotel. Dati
+            // allowance lang ang tiningnan — kaya kapag bumalik ang traveller sa
+            // Step 01 at pumili ng ibang hotel na magkparehong budget, naibigay
+            // sa kanya ang listahan na ayon sa distansya mula sadating hotel.
+            const cacheKey = `${allowance}|${hotelName}|${selectedHotelGeocoded ? selectedLat : 'nogeocode'}`;
+
+            if (!force && loadedPlacesKey === cacheKey) {
+                return;
+            }
+
+            loadedPlacesKey = cacheKey;
+            setPlacesStatus('loading', '<span class="w-1.5 h-1.5 rounded-full bg-[var(--ember)] pulse-soft"></span> Finding spots near your hotel…');
+
+            // REGRESSION FIX — ito ang totoong kalakal.
+            //
+            // Dati, kahit ANONG error sa function na ito ay nagtatakbo sa catch
+            // na naglilinis ng `placeOptions` at nagre-render. Isang
+            // ReferenceError sa isang kosmetikong label (ang sort note) ay
+            // naging 47 na na-load na lugar na "0" sa bawat chip at "wala kang
+            // mapipili".
+            //
+            // Ngayon, ang datos ay NILILINIS LANG kung talagang hindi dumating ang
+            // payload. Kung dumating na ito at may ibang sira sa huli, ang
+            // listahan ay nananatiling buo at ang error ay iniuulat lamang — ang
+            // isang sirang label ay hindi dapat magmahalaga ng pindutan ng
+            // "Generate".
+            let fetched = false;
+
+            try {
+                // REGRESSION FIX: ang mga DOM write na ito ay dating labas ng try.
+                // Kapag nawala ang isang element (hal. mula sa cached na HTML),
+                // ang TypeError ay naging unhandled rejection — walang fetch, walang
+                // card, at walang mensahe. Null-guard na sila, at nasa loob na ng
+                // try.
+                const allowanceEl = document.getElementById('places-allowance');
+                const originEl = document.getElementById('places-origin');
+                if (allowanceEl) {
+                    allowanceEl.textContent = allowance > 0 ? `₱${formatPrice(Math.round(allowance))}` : '₱0';
+                }
+                if (originEl) {
+                    originEl.textContent = hotelName || 'your hotel';
+                }
+
+                // REGRESSION FIX: kapag hindi pa geocode ang hotel, huwag ipadala
+                // ang map fallback bilang pinagmulan — magiging totoo ang
+                // `origin_known` at maaaring magmukhang "nearest first" ang isang
+                // listahan na ayon naman sa rating.
+                const origin = selectedHotelGeocoded
+                    ? `&lat=${selectedLat}&lon=${selectedLon}`
+                    : '';
+                const res = await fetch(`/api/places?daily_allowance=${allowance}${origin}`);
+                if (!res.ok) throw new Error(`Places request failed (${res.status})`);
+
+                const data = await res.json();
+                if (!data || typeof data !== 'object') {
+                    throw new Error('The places service returned an unexpected response.');
+                }
+
+                placeOptions = data;
+                placeOptions.within_budget = placeOptions.within_budget || {};
+                placeOptions.over_budget = placeOptions.over_budget || {};
+                fetched = true;
+
+                // REGRESSION FIX: kung bumaba ang budget, maaaring wala nang
+                // anumang beach (hal.) na umaangkop. Dati ay nananatiling aktibo
+                // ang filter chip na iyon — disabled man, nakatago pa rin sa
+                // 'is-active' — kaya walang lumalabas na card at walang
+                // makakapili ng ibang kategorya ang traveller.
+                if (activePlaceFilter !== 'all'
+                    && allWithinBudgetPlaces().filter(p => p.category === activePlaceFilter).length === 0) {
+                    activePlaceFilter = 'all';
+                }
+
+                // Kapag bina ang budget, maaaring wala na sa bagong bracket ang
+                // dating pinili. Itinatapon ang mga naaari — ang label na wala
+                // nang presyo ay laging mali para sa server.
+                const selectable = new Set(allWithinBudgetPlaces().map(p => p.name));
+                const dropped = selectedPlaces.filter(name => !selectable.has(name));
+                selectedPlaces = selectedPlaces.filter(name => selectable.has(name));
+
+                renderPlaceFilters();
+                renderPlaceCards();
+                updatePlaceSummary();
+
+                const statusEl = document.getElementById('places-status');
+                if (statusEl && allWithinBudgetPlaces().length > 0) {
+                    statusEl.classList.add('hidden');
+                }
+
+                // Tapat lamang ang label kapag may alam na hotel coordinates —
+                // kung wala, ayon sa rating ang pagkakasunod-sunod.
+                const nearest = visiblePlaces()[0];
+                const nearestKm = Number(nearest?.distance_km);
+                if (sortNoteEl) {
+                    sortNoteEl.textContent = placeOptions.origin_known
+                        ? (Number.isFinite(nearestKm)
+                            ? `Sorted nearest first · closest is ${nearestKm < 1 ? `${Math.round(nearestKm * 1000)}m` : `${nearestKm.toFixed(1)}km`} away`
+                            : 'Sorted nearest first')
+                        : 'This stay has no map location yet — sorted by rating instead.';
+                }
+
+                if (dropped.length > 0) {
+                    showToast(`Budget changed — removed ${dropped.length} pick(s) that no longer fit.`, 'info', 5000);
+                }
+            } catch (error) {
+                console.error('[Planora] Place picker failed:', error);
+
+                // REGRESSION FIX: ito ang pinakaimportanteng linya. Dati, WALANG
+                // pagtatangkang ikondisyonal ito — kaya kahit matagumpay ang fetch
+                // at 47 nang card ang naka-render, isang ReferenceError sa
+                // sort-note ay NAGPAPAWALANG lahat. Ngayon, ang listahan ay
+                // nananatiling buo at ang error ay iniuulat lamang.
+                if (!fetched) {
+                    // Walang payload na dumating — ito lang ang sitwasyong tama
+                    // na mag-clear. Hindi ito hadlang: optional ang picker.
+                    placeOptions = { within_budget: {}, over_budget: {} };
+                    renderPlaceFilters();
+                    renderPlaceCards();
+                    updatePlaceSummary();
+                }
+
+                if (sortNoteEl) sortNoteEl.textContent = '';
+
+                setPlacesStatus(
+                    'error',
+                    `<span class="text-[var(--ember-deep)]">${escapeHtml(error.message || 'Could not load places.')} `
+                    + 'You can still generate an itinerary below.</span>'
+                );
+            }
+        }
+
+        // Isang pagkaka-source ng pagpapatak: ang Step 02, ang picker, at ang
+        // submit ay dapat gumamit ng parehong pagpapahalaga. Dati, ang
+        // checkBudget()/currentDailyAllowance() ay may `|| 1` na fallback pero
+        // walang ang submit — kaya kapag binura ang "days", pumapasok ang NaN,
+        // nase-serialize ito bilang JSON null, at tinutuktok ng server ang
+        // validation ng 'days' => 'required' (422) na walang malinaw na dahilan.
+        function readTripDays() {
+            const days = parseInt(document.getElementById('trip-days').value, 10);
+            return (Number.isInteger(days) && days >= 1 && days <= 30) ? days : null;
+        }
+
+        function readTripBudget() {
+            const budget = parseFloat(document.getElementById('trip-budget').value);
+            return (Number.isFinite(budget) && budget > 0 && budget <= MAX_TRIP_BUDGET) ? budget : null;
+        }
+
+        async function goToPlaces() {
+            if (readTripBudget() === null) {
+                showToast('Please enter a valid budget amount.', 'warning');
+                return;
+            }
+
+            if (readTripDays() === null) {
+                showToast('Please enter how many days (1–30).', 'warning');
+                return;
+            }
+
+            document.getElementById('step-2').classList.remove('active');
+            document.getElementById('step-3').classList.add('active');
+            setActiveStub(3);
+
+            await loadPlaceOptions();
+        }
+
+        function goBackToStep2() {
+            document.getElementById('step-3').classList.remove('active');
+            document.getElementById('step-2').classList.add('active');
+            setActiveStub(2);
         }
 
         // —— Rest schedule: ang traveller mismo ang pumipili ng oras ng rest ——
@@ -1225,26 +1819,43 @@
             });
         }
 
-        async function confirmPlan() {
-            const days = parseInt(document.getElementById('trip-days').value, 10);
-            const budget = parseFloat(document.getElementById('trip-budget').value);
+        async function generateItinerary() {
             // Ang oras ng rest ay galing sa time pickers na pinuno ng traveller.
             const restDays = collectRestWindows();
-            if (!budget || budget <= 0) {
+            const days = readTripDays();
+            const budget = readTripBudget();
+
+            if (budget === null) {
                 showToast('Please enter a valid budget amount.', 'warning');
                 return;
             }
-            toggleButtonState('btn-confirm', false);
-            document.getElementById('step-2').classList.remove('active');
-            document.getElementById('step-3').classList.add('active');
-            setActiveStub(3);
+
+            // REGRESSION FIX: walang proteksyon ang 'days' dati. Kapag binura
+            // ang field, parseInt() ay NaN, JSON.stringify() ay naging null, at
+            // tinutuktok ng server ang 'days' => 'required' — isang 422 na walang
+            // malinaw na mensahe sa screen, na tila sira ang app.
+            if (days === null) {
+                showToast('Please enter how many days (1–30).', 'warning');
+                return;
+            }
+
+            toggleButtonState('btn-generate', false);
+            document.getElementById('step-3').classList.remove('active');
+            document.getElementById('step-4').classList.add('active');
+            setActiveStub(4);
             document.getElementById('map').style.display = 'block';
             nearbyPlacesData = [];
             nearbyPlacesIndex = [];
-            initMap();
-            showProgress(1);
 
+            // Ang index 1 ("Checking weather…") ay hindi na ginagamit: na-resolve
+            // na ng server ang kondisyon mula sa coordinates ng hotel, kaya walang
+            // weather round-trip dito sa browser.
+            showProgress(0);
+            initMap();
+
+            showProgress(2);
             await fetchNearbyAmenities(selectedLat, selectedLon);
+
             showProgress(3);
             fetch('/generate-plan', {
                 method: 'POST',
@@ -1260,7 +1871,10 @@
                     rest_days: restDays,
                     // Live conditions are resolved server-side, so the client no
                     // longer sends a hardcoded "not available" placeholder.
-                    nearby_places: nearbyPlacesData.join('|')
+                    nearby_places: nearbyPlacesData.join('|'),
+                    // Ang mga pinili sa Step 03. Ang server ang nagsasabi kung
+                    // alin ang totoo at tinatanggap mula sa katalogo.
+                    selected_places: selectedPlaces
                 })
             })
             .then(async res => {
@@ -1277,8 +1891,11 @@
             .then(data => {
                 showProgress(4);
                 renderItinerary(data.recommendation, data);
-                // Sa itinerary lang nakasalalay ang POI pins sa mapa.
+                // Sa itinerary lang nakasalalay ang POI pins sa mapa, pero ang
+                // mga pinili ng traveller ay pinipin kahit hindi sila maabot ng
+                // salita — kung hindi, magmumukhang walang epekto ang picker.
                 renderSuggestedPlaces();
+                renderPickedPlaces(data.selected_places || selectedPlaces);
                 const warningBox = document.getElementById('budget-warning-box');
                 if (data.budget_warning) {
                     warningBox.innerText = data.budget_warning;
@@ -1297,12 +1914,27 @@
                     showToast(error.message, 'warning', 6000);
                 }
                 stopUserTracking();
-                document.getElementById('step-3').classList.remove('active');
-                document.getElementById('step-2').classList.add('active');
-                setActiveStub(2);
+                // Papunta sa Step 03, hindi sa 02 — ang budget guard ay
+                // tinatawag habang nasa unang await, kaya ang mga napiling
+                // lugar ay pa rin ang context na dapat makita ang error.
+                document.getElementById('step-4').classList.remove('active');
+                document.getElementById('step-3').classList.add('active');
+                setActiveStub(3);
             })
             .finally(() => {
-                toggleButtonState('btn-confirm', true);
+                // REGRESSION FIX: ang btn-generate ay dinidisable sa simula ng
+                // pag-submit, pero walang tumutugon na nag-e-enable nang muli.
+                // Kapag may error, ibinabalik namin ang traveller sa Step 03 —
+                // kung hindi, hindi niya maipapindut ang "Generate itinerary"
+                // ulit at kailangan ng full reload para makabawi.
+                //
+                // Hindi nito binubuksan ang pindutan kapang walang katotohanan:
+                // ang 'budget < lodging' na hard guard ay nasa btn-confirm /
+                // checkBudget(), hindi dito. Ang pindutan ay 'type="button"'
+                // na walang default na aksyon, kaya walang mapipigil kahit
+                // kapag naka-disable.
+                toggleButtonState('btn-generate', true);
+                checkBudget();
             });
         }
 
@@ -1328,6 +1960,8 @@
                 const days = daysInput ? parseInt(daysInput.value, 10) : null;
                 if (days) parts.push(`${days} day${days > 1 ? 's' : ''}`);
                 if (meta.daily_allowance) parts.push(`~PHP ${Number(meta.daily_allowance).toLocaleString()}/day allowance`);
+                const pickCount = (meta.selected_places || selectedPlaces || []).length;
+                if (pickCount) parts.push(`${pickCount} of your picks`);
                 metaText.innerText = parts.join(' · ');
                 headerCard.classList.remove('hidden');
             }
@@ -1471,6 +2105,12 @@
         let userWatchId = null;
         let lastRoutedPoint = null;
         let lastRoutedAt = null;
+        // Dalawang magkaibang tanong ang nasa likod ng tracking: ang
+        // `trackingWanted` ay ang kagustuhan ng traveller, habang ang
+        // `userWatchId` ay ang totoong estado ng watch. Walang flag na ito dati,
+        // kaya ang visibilitychange handler na nagre-restart ay binubura ang
+        // pagpipili na patayin na ng user ang tracking.
+        let trackingWanted = false;
         const REROUTE_MIN_MOVE_KM = 0.12;   // ~120 m na galaw bago mag-recompute
         const REROUTE_MAX_AGE_MS = 25000;   // o 25s na pagitan — alinman ang mauna
 
@@ -1543,6 +2183,10 @@
                 attributionControl: true
             }).setView([selectedLat, selectedLon], 14);
             markerLayers = L.layerGroup().addTo(map);
+
+            // Isang delegated listener lang bawat recreated na mapa, kaya walang
+            // pag-iipon ng listener habang naglilipat ng Step 3.
+            map.getContainer().addEventListener('click', handlePoiActionClick);
 
             // Custom styled tile layer
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -1632,18 +2276,43 @@
             return (now - lastAt) >= REROUTE_MAX_AGE_MS;
         }
 
+        // Sentinel na sinasabing "naka-subscribe pa" — hindi pa natin alam ang totoong
+        // watch id.
+        const WATCH_PENDING = -1;
+
         function startUserTracking() {
+            trackingWanted = true;
             if (!navigator.geolocation || userWatchId !== null) return;
 
-            userWatchId = navigator.geolocation.watchPosition(
+            // Itinatag muna ang sentinel bago mag-subscribe. May browser na
+            // tumatawag ng error handler na synchronous, at kung sa ganoon ay
+            // hindi pa napapasok ng stopUserTracking() ang watchId — naipupunta
+            // ang watch na hindi na kayang i-clear.
+            userWatchId = WATCH_PENDING;
+
+            const watchId = navigator.geolocation.watchPosition(
                 onUserPosition,
                 onUserPositionError,
                 { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
             );
+
+            if (userWatchId === WATCH_PENDING) {
+                userWatchId = watchId;
+            } else {
+                // Na-error na bago makapasok ang assignment: patay na ito,
+                // huwag nang itong panatilihin bilang aktibong watch id.
+                navigator.geolocation.clearWatch(watchId);
+            }
+
             setTrackingState(true);
         }
 
-        function stopUserTracking() {
+        // Ang `keepIntent` ay para sa visibilitychange handler: ang pagpigil
+        // dahil naka-background ang tab ay hindi dapat mag-clear ng kagustuhan
+        // ng traveller, kaya i-rerestart pa rin ang watch pagbalik.
+        function stopUserTracking(options = {}) {
+            if (!options.keepIntent) trackingWanted = false;
+
             if (userWatchId !== null && navigator.geolocation) {
                 navigator.geolocation.clearWatch(userWatchId);
             }
@@ -1655,12 +2324,14 @@
         }
 
         function toggleUserTracking() {
-            if (userWatchId === null) {
-                startUserTracking();
-                showToast('Live tracking on — the U pin follows you.', 'success', 3000);
-            } else {
+            // Dati ay `userWatchId === null` ang ginamit, kaya kapag na-error
+            // nang magsubscribe ay inuulit ang pag-on.
+            if (trackingWanted) {
                 stopUserTracking();
                 showToast('Live tracking stopped.', 'info', 3000);
+            } else {
+                startUserTracking();
+                showToast('Live tracking on — the U pin follows you.', 'success', 3000);
             }
         }
 
@@ -1809,12 +2480,8 @@
                 map.removeControl(currentRouteControl);
             }
 
-            // Smooth fly animation to target
-            map.flyTo([targetLat, targetLon], 15, {
-                duration: 1.2,
-                easeLinearity: 0.3
-            });
-
+            // Walang hiwalay na flyTo(): ang fitBounds() sa ibaba ay agad na
+            // naka-o-override ng animation, kaya patay na code ito dati.
             currentRouteControl = L.Routing.control({
                 waypoints: [
                     L.latLng(selectedLat, selectedLon),
@@ -1843,6 +2510,25 @@
             map.closePopup();
         };
 
+        // Delegated na click handler para sa mga button ng POI popup. Ang
+        // `data-*` na paraan ang ginamit kaysa sa inline na `onclick` dahil
+        // ang pangalan ay panlabas na datos — hindi ito ligtas na ilagay sa
+        // loob ng JS string na attribute.
+        function handlePoiActionClick(event) {
+            const trigger = event.target.closest('[data-poi-action]');
+            if (!trigger) return;
+
+            const lat = parseFloat(trigger.dataset.lat);
+            const lon = parseFloat(trigger.dataset.lon);
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+
+            if (trigger.dataset.poiAction === 'route') {
+                drawRouteTo(lat, lon);
+            } else if (trigger.dataset.poiAction === 'checkin') {
+                checkIn(lat, lon, trigger.dataset.name || '');
+            }
+        }
+
         async function fetchNearbyAmenities(lat, lon) {
             try {
                 const res = await fetch(`/api/nearby-places?lat=${lat}&lon=${lon}`);
@@ -1863,7 +2549,9 @@
                     const places = categorized[type];
                     if (!places || !Array.isArray(places)) return;
                     places.forEach((place, pIdx) => {
-                        const distKm = haversineKm(selectedLat, selectedLon, parseFloat(place.lat), parseFloat(place.lon));
+                        const placeLat = Number(place.lat);
+                        const placeLon = Number(place.lon);
+                        const distKm = haversineKm(selectedLat, selectedLon, placeLat, placeLon);
                         const distText = distKm < 1
                             ? `${Math.round(distKm * 1000)}m away`
                             : `${distKm.toFixed(1)}km away`;
@@ -1871,7 +2559,7 @@
                         const weatherElId = `weather-popup-${type}-${pIdx}`;
                         let popupHTML = `
                             <div style="min-width: 180px;">
-                                <b style="font-size: 1rem; margin-bottom: 0.4rem; display: block;">${place.name}</b>
+                                <b style="font-size: 1rem; margin-bottom: 0.4rem; display: block;">${escapeHtml(place.name)}</b>
                                 <div style="display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.5rem;">
                                     <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${type === 'restaurant' ? '#C2410C' : type === 'mall' ? '#0E5F5A' : type === 'beach' ? '#0891B2' : '#2E7D32'}; box-shadow: 0 0 0 2px rgba(0,0,0,0.1);"></span>
                                     <span style="font-size: 0.8rem; color: var(--ink-soft);">${iconMap[type].label}</span>
@@ -1879,8 +2567,8 @@
                                 </div>
                                 <div id="${weatherElId}"></div>
                                 <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
-                                    <button onclick="drawRouteTo(${place.lat}, ${place.lon})" style="flex: 1; min-width: 100px; background: var(--deep-teal); color: white; padding: 0.5rem 0.75rem; border-radius: 0.5rem; font-size: 0.75rem; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s; font-family: 'Inter', sans-serif;" onmouseover="this.style.background='var(--ember)'" onmouseout="this.style.background='var(--deep-teal)'">Show Route</button>
-                                    ${isAuthenticated ? `<button onclick="checkIn(${place.lat}, ${place.lon}, '${place.name.replace(/'/g, "\\'")}')" style="flex: 1; min-width: 100px; background: var(--ember); color: white; padding: 0.5rem 0.75rem; border-radius: 0.5rem; font-size: 0.75rem; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s; font-family: 'Inter', sans-serif;" onmouseover="this.style.background='var(--ember-deep)'" onmouseout="this.style.background='var(--ember)'">Check In</button>` : ''}
+                                    <button type="button" data-poi-action="route" data-lat="${placeLat}" data-lon="${placeLon}" style="flex: 1; min-width: 100px; background: var(--deep-teal); color: white; padding: 0.5rem 0.75rem; border-radius: 0.5rem; font-size: 0.75rem; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s; font-family: 'Plus Jakarta Sans', sans-serif;" onmouseover="this.style.background='var(--ember)'" onmouseout="this.style.background='var(--deep-teal)'">Show Route</button>
+                                    ${isAuthenticated ? `<button type="button" data-poi-action="checkin" data-lat="${placeLat}" data-lon="${placeLon}" data-name="${escapeHtml(place.name)}" style="flex: 1; min-width: 100px; background: var(--ember); color: white; padding: 0.5rem 0.75rem; border-radius: 0.5rem; font-size: 0.75rem; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s; font-family: 'Plus Jakarta Sans', sans-serif;" onmouseover="this.style.background='var(--ember-deep)'" onmouseout="this.style.background='var(--ember)'">Check In</button>` : ''}
                                 </div>
                             </div>
                         `;
@@ -1891,8 +2579,8 @@
                             type: type,
                             iconLabel: iconMap[type].label[0],
                             iconClass: iconMap[type].cls,
-                            lat: parseFloat(place.lat),
-                            lon: parseFloat(place.lon),
+                            lat: placeLat,
+                            lon: placeLon,
                             popupHTML: popupHTML,
                             weatherElId: weatherElId
                         });
@@ -1948,11 +2636,32 @@
         // kaya dito lang naglalagay ng POI markers imbes na sa
         // fetchNearbyAmenities() — kung ano lang ang sinuggest, iyon lang ang
         // lalabas sa mapa.
+        //
+        // Isang function para sa parehong tawag: noong hiwalay ang ginamit ng
+        // renderSuggestedPlaces() (markdown + DOM) at ng renderPickedPlaces()
+        // (markdown lang), isang lugar na nabanggit sa DOM pero hindi sa
+        // markdown ay napipin TWICE.
+        function currentItineraryText() {
+            const outputEl = document.getElementById('ai-output');
+            return normalizePlaceText(`${currentItineraryMarkdown} ${outputEl ? outputEl.textContent : ''}`);
+        }
+
+        // Mga kategoryang may pin sa mapa. Ibinabahagi ng dalawang renderer
+        // dahil updateLegendVisibility() ay nagta-toggle ng buong legend sa
+        // isang pagkakataon — kung magkaibang set ang bawat isa, ang huli na
+        // nakatawag ang may hawak ng katotohanan, at nawawala ang legend ng
+        // isang kategoryang may pin.
+        let plottedMapTypes = new Set();
+
         function renderSuggestedPlaces() {
             if (!markerLayers) return 0;
 
-            const outputEl = document.getElementById('ai-output');
-            const itineraryText = normalizePlaceText(`${currentItineraryMarkdown} ${outputEl ? outputEl.textContent : ''}`);
+            // Bago ang anumang maagang return: kung hindi, may hinuling set ang
+            // mga pinili sa susunod na renderPickedPlaces() at lilitaw ang
+            // legend ng kategoryang walang pin.
+            plottedMapTypes = new Set();
+
+            const itineraryText = currentItineraryText();
             if (itineraryText === '') return 0;
 
             // Ang basecamp ay may sariling 'H' pin na, kaya hindi na ito dapat
@@ -1960,7 +2669,6 @@
             const hotelKey = normalizePlaceText(hotelName);
 
             const plottedNames = new Set();
-            const plottedTypes = new Set();
 
             nearbyPlacesIndex.forEach(place => {
                 const key = normalizePlaceText(place.name);
@@ -1969,7 +2677,7 @@
                 if (!itineraryMentionsPlace(place.name, itineraryText)) return;
 
                 plottedNames.add(key);
-                plottedTypes.add(place.type);
+                plottedMapTypes.add(place.type);
 
                 const marker = L.marker([place.lat, place.lon], { icon: makeIcon(place.iconLabel, place.iconClass) })
                     .addTo(markerLayers).bindPopup(place.popupHTML);
@@ -1978,13 +2686,73 @@
                 });
             });
 
-            updateLegendVisibility(plottedTypes);
+            updateLegendVisibility(plottedMapTypes);
 
-            if (plottedNames.size === 0 && nearbyPlacesIndex.length > 0) {
+            if (plottedNames.size === 0 && nearbyPlacesIndex.length === 0) {
                 showToast('Your itinerary did not name any nearby spot, so only the hotel and your location are pinned.', 'info', 5000);
             }
 
             return plottedNames.size;
+        }
+
+        // Ang mga pinili ng traveller ay galing sa `locations` katalogo, hindi
+        // sa Overpass — kaya wala sila sa nearbyPlacesIndex at hindi mapipin ng
+        // renderSuggestedPlaces(). Sila mismo ang source of truth ng kanilang
+        // presyo at coordinates, kaya safe nating ipin directly rito.
+        function renderPickedPlaces(labels) {
+            if (!markerLayers || !Array.isArray(labels) || labels.length === 0) return 0;
+
+            // Parehong teksto ang ginagamit ng dalawang renderer. Kung magkaibang
+            // pinagmulan noon (markdown + DOM dito, markdown lang doon), isang
+            // lugar na nabanggit lamang sa DOM ay napipin nang dalawa.
+            const itineraryText = currentItineraryText();
+            const alreadyPlotted = new Set(
+                nearbyPlacesIndex
+                    .filter(place => itineraryMentionsPlace(place.name, itineraryText))
+                    .map(place => normalizePlaceText(place.name))
+            );
+            const hotelKey = normalizePlaceText(hotelName);
+            let plotted = 0;
+
+            labels.forEach(label => {
+                // Ang server ay nagpapadala ng "Name (Category)"; ang katalogo
+                // naman ay may bare name lang.
+                const name = String(label).replace(/\s*\((Restaurant|Mall|Beach|Tourist Spot)\)\s*$/i, '').trim();
+                const place = findPlace(name);
+                if (!place) return;
+
+                const key = normalizePlaceText(place.name);
+                if (alreadyPlotted.has(key)) return;
+                if (hotelKey.length >= 3 && (key.includes(hotelKey) || hotelKey.includes(key))) return;
+
+                alreadyPlotted.add(key);
+                plottedMapTypes.add(place.category);
+
+                const meta = PLACE_CATEGORIES.find(c => c.key === place.category) || PLACE_CATEGORIES[3];
+                L.marker([place.lat, place.lon], { icon: makeIcon(meta.letter, meta.pin) })
+                    .addTo(markerLayers)
+                    .bindPopup(`
+                        <div style="min-width: 180px;">
+                            <b style="font-size: 1rem; margin-bottom: 0.4rem; display: block;">${escapeHtml(place.name)}</b>
+                            <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${meta.dot};"></span>
+                                <span style="font-size: 0.8rem; color: var(--ink-soft);">${escapeHtml(meta.label)}</span>
+                                <span style="font-size: 0.75rem; margin-left: auto; font-family: 'JetBrains Mono', monospace;">₱${formatPrice(place.budget_per_day)}/day</span>
+                            </div>
+                            <div style="font-size: 0.72rem; color: var(--sage); margin-top: 0.5rem; font-family: 'JetBrains Mono', monospace;">Your pick</div>
+                        </div>
+                    `);
+
+                plotted++;
+            });
+
+            // REGRESSION FIX: kailan itong tawag. Noon, ang legend ay ina-update
+            // ng renderSuggestedPlaces() bago pa man magkaroon ng pin ang mga
+            // pinili — kaya kung beach ang napili pero walang beach na binanggit
+            // ng itinerary, may beach na pin sa mapa nang walang legend.
+            updateLegendVisibility(plottedMapTypes);
+
+            return plotted;
         }
 
         // Hindi maintindihan ng traveller ang legend entry na walang pin sa mapa.
@@ -2139,11 +2907,6 @@
         const searchStatus = document.getElementById('search-status');
         const hotelList = document.getElementById('hotel-list');
 
-        hotelSearchInput?.addEventListener('input', () => {
-            const hasValue = hotelSearchInput.value.trim().length > 0;
-            clearSearchBtn.classList.toggle('hidden', !hasValue);
-        });
-
         clearSearchBtn?.addEventListener('click', () => {
             hotelSearchInput.value = '';
             clearSearchBtn.classList.add('hidden');
@@ -2241,8 +3004,13 @@
             else fetchHotels();
         });
 
+        // Iisang listener lang para sa input: itinatago ang clear button at
+        // hinahanap ang hotel. Dalawang listener dito dati, kaya hindi
+        // palaging magkatugma ang estado ng clear button at ng listahan.
         hotelSearchInput?.addEventListener('input', (e) => {
             const query = e.target.value.trim();
+            clearSearchBtn?.classList.toggle('hidden', query.length === 0);
+
             if (query) {
                 debouncedHotelSearch(query);
             } else {
@@ -2310,14 +3078,16 @@
 
         // Sa mobile, humihinto ang GPS updates kapag naka-background ang tab o
         // naka-lock ang screen — kaya itinitigil natin ang watch at binubuksan
-        // ulit kapag bumalik ang traveller sa Step 3.
+        // ulit kapag bumalik ang traveller sa Step 4 (ang step ng mapa).
         document.addEventListener('visibilitychange', () => {
-            const stepThree = document.getElementById('step-3');
-            const onStepThree = !!stepThree && stepThree.classList.contains('active');
+            const itineraryStep = document.getElementById('step-4');
+            const onItineraryStep = !!itineraryStep && itineraryStep.classList.contains('active');
 
             if (document.hidden) {
-                stopUserTracking();
-            } else if (onStepThree) {
+                // Pansamantala lang ito — panatilihin ang kagustuhan para
+                // mag-rerestart ang watch pagbalik ng traveller.
+                stopUserTracking({ keepIntent: true });
+            } else if (onItineraryStep && trackingWanted) {
                 startUserTracking();
             }
         });

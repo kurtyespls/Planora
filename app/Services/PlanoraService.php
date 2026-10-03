@@ -3,10 +3,12 @@
 namespace App\Services;
 
 use App\Models\Hotel;
+use App\Models\Location;
 use App\Models\Plan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
  * Business logic for Planora itinerary planning.
@@ -48,9 +50,111 @@ class PlanoraService
     public const NIGHTS_PER_DAY_OFFSET = 1;
 
     /**
+     * Smallest daily allowance that can produce a real itinerary: roughly one
+     * meal plus tricycle fares.
+     *
+     * The lodging guard alone is not enough. It only proves the budget covers
+     * the hotel, never that anything is left over — and for a 1-day trip the
+     * lodging cost is PHP 0, so *every* budget passed, down to the PHP 1 that
+     * 'numeric|min:1' allows. The traveller got a full day-by-day itinerary
+     * priced at one peso.
+     *
+     * Why PHP 200 rather than zero: the catalogue genuinely contains free
+     * attractions (the Cathedral, the bangus landing centre, the city plaza),
+     * so a zero floor would not be honest either — those trips are walkable but
+     * not plannable. The cheapest restaurant in the catalogue is PHP 200 and a
+     * tricycle is PHP 15-20, so PHP 200 is the point where "food and transport"
+     * still works. Below the floor buildBudgetWarning() takes over as a softer
+     * band (PHP 200-500 reads as "tight", PHP 500+ as comfortable).
+     *
+     * Public so the browser mirrors the rule instead of re-deriving it, the
+     * same reason NIGHTS_PER_DAY_OFFSET is public (see planora.blade.php).
+     */
+    public const MIN_DAILY_ALLOWANCE = 200.0;
+
+    /**
+     * Largest total trip budget the planner will accept, in PHP.
+     *
+     * There used to be no ceiling at all — only `min:1` — so a stray keystroke
+     * produced a PHP 123,000,000 daily allowance. Beyond this number the trip
+     * stops being a budget and the picker becomes meaningless: every one of the
+     * 47 catalogue places qualifies, so "swak sa budget mo" says nothing. It also
+     * lets the picker cache mint a fresh key per peso typed.
+     *
+     * Comfortably above any real Dagupan trip while still catching typos.
+     */
+    public const MAX_TRIP_BUDGET = 1000000.0;
+
+    /**
      * Format ng custom na rest window na ipinapadala ng browser.
      */
     private const REST_WINDOW_PATTERN = '/^([01]\d|2[0-3]):([0-5]\d)-([01]\d|2[0-3]):([0-5]\d)$/';
+
+    /**
+     * Category vocabulary shared by the place picker, the map legend, the AI
+     * prompt tags and the saved-plan labels. These keys are the Location
+     * constants on purpose so a category can never be spelled one way in the
+     * seeders and another way here.
+     */
+    public const PLACE_CATEGORY_LABELS = [
+        Location::CATEGORY_RESTAURANT => 'Restaurant',
+        Location::CATEGORY_MALL       => 'Mall',
+        Location::CATEGORY_BEACH      => 'Beach',
+        Location::CATEGORY_TOURIST    => 'Tourist Spot',
+    ];
+
+    /**
+     * How many places a traveller may pin before the AI is sent off to build an
+     * itinerary. Past this the prompt stops being a schedule and starts being a
+     * grocery list, which is worse for the traveller than letting the AI choose.
+     *
+     * Mirrored as MAX_SELECTED_PLACES in planora.blade.php so the picker disables
+     * its last checkbox instead of letting the server reject a submission the
+     * traveller believed was valid.
+     */
+    public const MAX_SELECTED_PLACES = 12;
+
+    /**
+     * Per-category ceiling on those picks. Without it a traveller who ticks six
+     * restaurants crowds the other three categories out of the list entirely.
+     */
+    public const MAX_SELECTED_PLACES_PER_CATEGORY = 4;
+
+    /**
+     * How many Overpass places may be offered to the model on top of the
+     * traveller's own picks. Kept separate from the picks because the two are
+     * not interchangeable: a pick is a promise, an Overpass result is a
+     * suggestion, and only the suggestions are allowed to be trimmed.
+     */
+    public const NEARBY_PLACE_PROMPT_LIMIT = 10;
+
+    /**
+     * Shortest a pick may be before it is allowed to fuzzy-match a catalogue
+     * row. Only guards against one- or two-character prefixes; the real
+     * discrimination is done by MIN_FUZZY_PICK_RATIO.
+     */
+    private const MIN_FUZZY_PICK_LENGTH = 4;
+
+    /**
+     * How much of the longer key the shorter one must account for before a
+     * fuzzy match is trusted.
+     *
+     * 0.7 keeps typo-tolerance working ("Tondaligan Blue Beac" still finds
+     * "Tondaligan Blue Beach") while rejecting the case that actually matters:
+     * a bare category word. "beach" is 5 of the 21 characters in
+     * "Tondaligan Blue Beach" — 24% — so it no longer silently resolves to
+     * whichever coastal place happens to be first in the catalogue.
+     */
+    private const MIN_FUZZY_PICK_RATIO = 0.7;
+
+    /**
+     * Granularity of the place-catalogue cache key. See
+     * CacheService::getBudgetFriendlyPlaces().
+     */
+    private const ALLOWANCE_BUCKET_SIZE = 50;
+
+    /** Radius in metres used when no origin is known — Dagupan's city proper. */
+    private const EARTH_RADIUS_M = 6371000;
 
     /**
      * Ang AI ay madaling mag-24-hour kahit 12-hour ang hinihingi, kaya ang
@@ -68,6 +172,60 @@ class PlanoraService
     public static function nightsFor(int $days): int
     {
         return max(0, $days - self::NIGHTS_PER_DAY_OFFSET);
+    }
+
+    /**
+     * Money left per day once lodging is paid for.
+     *
+     * This is the one number three surfaces agree on: the server-side budget
+     * guard in buildItinerary(), the browser's #budget-hint estimate, and the
+     * place picker's eligibility filter. Deriving it in one place is what stops
+     * the picker from offering a place the guard would then reject.
+     *
+     * @param float $nightlyRate  Hotel rate per night.
+     * @param float $budget       Total trip budget in PHP.
+     */
+    public static function dailyAllowanceFor(float $nightlyRate, float $budget, int $days): float
+    {
+        if ($days <= 0) {
+            return 0.0;
+        }
+
+        $lodging = $nightlyRate * self::nightsFor($days);
+
+        return max(0.0, ($budget - $lodging) / $days);
+    }
+
+    /**
+     * Normalised comparison key for a place name: lowercased, de-accented and
+     * stripped of everything that is not a letter or digit.
+     *
+     * The browser sends back whatever string was in the dataset, so "SM Center
+     * Dagupan" and "sm center dagupan" have to resolve to the same catalogue row.
+     */
+    public static function placeKey(string $value): string
+    {
+        return (string) preg_replace('/[^a-z0-9]+/', '', Str::ascii(Str::lower(trim($value))));
+    }
+
+    /**
+     * Great-circle distance in kilometres, or null when either end is unknown.
+     * Distances are only ever shown as a "how far am I walking" hint, so null is
+     * an honest answer for a POI or a hotel that was never geocoded.
+     */
+    public static function distanceKm(?float $lat1, ?float $lon1, ?float $lat2, ?float $lon2): ?float
+    {
+        if ($lat1 === null || $lon1 === null || $lat2 === null || $lon2 === null) {
+            return null;
+        }
+
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLon = deg2rad($lon2 - $lon1);
+
+        $a = sin($dLat / 2) ** 2
+            + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLon / 2) ** 2;
+
+        return round(self::EARTH_RADIUS_M * 2 * atan2(sqrt($a), sqrt(1 - $a)) / 1000, 2);
     }
 
     /**
@@ -229,6 +387,206 @@ class PlanoraService
     }
 
     /**
+     * Curated Dagupan points of interest that fit what the traveller can spend
+     * per day, ordered by how close they are to the stay they picked. This backs
+     * the Step 03 place picker.
+     *
+     * The seeded `locations` catalogue is the only source that carries a real
+     * price — the Overpass results behind the map pins have no cost field at all
+     * — so it is the only thing that can honestly answer "does this fit my
+     * budget". Places that do *not* fit are still returned, flagged, because
+     * hiding them makes a thin budget look like a thin city.
+     *
+     * @param  float|null  $lat  Origin latitude (the chosen hotel) for distance hints.
+     * @param  float|null  $lon  Origin longitude.
+     * @return array{daily_allowance: float, origin_known: bool, within_budget: array<string, array<int, array<string, mixed>>>, over_budget: array<string, array<int, array<string, mixed>>>}
+     */
+    public function getBudgetFriendlyPlaces(float $dailyAllowance, ?float $lat = null, ?float $lon = null): array
+    {
+        $dailyAllowance = max(0.0, $dailyAllowance);
+        $bucket = (int) (round($dailyAllowance / self::ALLOWANCE_BUCKET_SIZE) * self::ALLOWANCE_BUCKET_SIZE);
+
+        $rows = CacheService::getBudgetFriendlyPlaces($bucket, fn () => Location::query()
+            ->whereIn('category', array_keys(self::PLACE_CATEGORY_LABELS))
+            ->get(['name', 'latitude', 'longitude', 'rating', 'category', 'icon', 'budgetPerDay', 'description'])
+            ->map(fn (Location $place) => [
+                'name' => $place->name,
+                'category' => $place->category,
+                'icon' => $place->icon ?: '📍',
+                'rating' => (float) $place->rating,
+                'budget_per_day' => (float) $place->budgetPerDay,
+                'description' => (string) $place->description,
+                'lat' => (float) $place->latitude,
+                'lon' => (float) $place->longitude,
+            ])
+            ->all());
+
+        $within = array_fill_keys(array_keys(self::PLACE_CATEGORY_LABELS), []);
+        $over = $within;
+
+        foreach ($rows as $row) {
+            $category = $row['category'];
+
+            if (!isset($within[$category])) {
+                continue;
+            }
+
+            $row['distance_km'] = self::distanceKm($lat, $lon, $row['lat'], $row['lon']);
+            $row['fits_budget'] = $row['budget_per_day'] <= $dailyAllowance;
+
+            if ($row['fits_budget']) {
+                $within[$category][] = $row;
+            } else {
+                $over[$category][] = $row;
+            }
+        }
+
+        // Nearest to the hotel first. Ang layunin ng picker ay matabilo ang
+        // paglalakbay, kaya ang distansya ang pangunahing pagkakasunod-sunod — ang
+        // rating ay nasa pagkatapos bilang tie-breaker at pampababa ng pagkakaiba.
+        //
+        // Kapag walang alam na hotel coordinates (hal. hindi pa na-geocode ang
+        // stay), walang maipapakitang distansya — sa kasalungat ay rating na
+        // ang batayan para hindi na kasing-pareho ang lahat ng pagkakasunod-sunod.
+        $originKnown = $lat !== null && $lon !== null;
+
+        $byDistance = function (array $a, array $b): int {
+            if ($a['distance_km'] === null && $b['distance_km'] === null) {
+                return $b['rating'] <=> $a['rating'];
+            }
+
+            // Ang hindi pa naka-geocode ay pinatagong dulo, hindi nangunguna.
+            if ($a['distance_km'] === null) {
+                return 1;
+            }
+
+            if ($b['distance_km'] === null) {
+                return -1;
+            }
+
+            return $a['distance_km'] <=> $b['distance_km']
+                ?: $b['rating'] <=> $a['rating']
+                ?: strcmp($a['name'], $b['name']);
+        };
+
+        $byRating = fn (array $a, array $b): int => $b['rating'] <=> $a['rating']
+            ?: strcmp($a['name'], $b['name']);
+
+        foreach ([&$within, &$over] as &$group) {
+            foreach ($group as &$places) {
+                usort($places, $originKnown ? $byDistance : $byRating);
+            }
+        }
+        unset($group, $places);
+
+        return [
+            'daily_allowance' => round($dailyAllowance, 2),
+            // Ang browser ay nagpapakita ng "nearest first" na label lamang
+            // kapag totoo ito — kung hindi, ipinapakita nito ang rating-based
+            // na label upang hindi maging maling pahayag.
+            'origin_known' => $originKnown,
+            'within_budget' => $within,
+            'over_budget' => $over,
+        ];
+    }
+
+    /**
+     * Resolve the traveller's free-form picks into canonical "Name (Category)"
+     * labels that both the AI prompt and the map pins already understand.
+     *
+     * Anything that matches no catalogue row is dropped rather than passed
+     * through. The prompt's first rule forbids inventing places, so forwarding an
+     * unrecognised string would be feeding the model exactly the kind of
+     * hallucination seed that rule exists to stop.
+     *
+     * @param  array<int, mixed>  $selectedPlaces
+     * @return array<int, string>
+     */
+    public function selectedPlaceLabels(array $selectedPlaces): array
+    {
+        $wanted = [];
+
+        foreach ($selectedPlaces as $name) {
+            if (!is_string($name)) {
+                continue;
+            }
+
+            $name = trim(strip_tags($name));
+
+            if ($name !== '') {
+                $wanted[] = $name;
+            }
+        }
+
+        $wanted = array_slice(array_values(array_unique($wanted)), 0, self::MAX_SELECTED_PLACES);
+
+        if ($wanted === []) {
+            return [];
+        }
+
+        $catalogue = [];
+
+        foreach (Location::query()
+            ->whereIn('category', array_keys(self::PLACE_CATEGORY_LABELS))
+            ->get(['name', 'category']) as $place) {
+            $catalogue[self::placeKey($place->name)] = $place->name
+                . ' (' . self::PLACE_CATEGORY_LABELS[$place->category] . ')';
+        }
+
+        $labels = [];
+
+        foreach ($wanted as $name) {
+            $key = self::placeKey($name);
+
+            if ($key === '') {
+                continue;
+            }
+
+            if (isset($catalogue[$key])) {
+                $labels[] = $catalogue[$key];
+                continue;
+            }
+
+            // Fall back to a fuzzy match so a traveller who edits a name, or a
+            // browser that trimmed punctuation, still lands on the right row.
+            //
+            // Dati ito ay plain substring matching, na malaking problema: ang
+            // "beach" ay substring ng halos lahat ng coastal catalogue, kaya
+            // naaabot nito ang unang row na masyado. Ngayon, tatlong dapat
+            // sabay: sapat ang haba, dapat isa sa dalawa ay panimula ng isa,
+            // at dapat saklawin ng maikli ang malaking bahagi nito. Ang huling
+            // isa ang tumatigil sa "beach" na pagkakamali — at ang paghula nang
+            // mali ay mas masama kaysa pagbitawan, dahil ang na-bitawan ay
+            // makikita (wala ito sa itinerary).
+            if (mb_strlen($key) < self::MIN_FUZZY_PICK_LENGTH) {
+                continue;
+            }
+
+            foreach ($catalogue as $candidateKey => $label) {
+                if ($candidateKey === '') {
+                    continue;
+                }
+
+                if (!str_starts_with($candidateKey, $key) && !str_starts_with($key, $candidateKey)) {
+                    continue;
+                }
+
+                $shorter = min(mb_strlen($key), mb_strlen($candidateKey));
+                $longer = max(mb_strlen($key), mb_strlen($candidateKey));
+
+                if ($shorter / $longer < self::MIN_FUZZY_PICK_RATIO) {
+                    continue;
+                }
+
+                $labels[] = $label;
+                continue 2;
+            }
+        }
+
+        return array_slice(array_values(array_unique($labels)), 0, self::MAX_SELECTED_PLACES);
+    }
+
+    /**
      * Generate an itinerary plan and persist it for the signed-in user.
      *
      * @throws \Symfony\Component\HttpKernel\Exception\HttpException when guest.
@@ -255,6 +613,9 @@ class PlanoraService
                 'budget' => $validated['budget'],
                 'total_days' => (int) $validated['days'],
                 'rest_days' => $validated['rest_days'] ?? [],
+                // Ang naresolve na canonical labels, hindi ang raw na string ng
+                // browser, para pareho ang babasahin sa profile at sa plan page.
+                'selected_places' => $result['selected_places'],
                 'ai_recommendation' => $result['recommendation'],
                 'ai_provider' => $result['ai_provider'],
             ]);
@@ -278,6 +639,10 @@ class PlanoraService
             'budget' => (float) $plan->budget,
             'days' => (int) $plan->total_days,
             'rest_days' => $plan->rest_days ?? [],
+            // Ang dating picks ang batayan ng muling pagkakaayos: ang "Regenerate"
+            // ay dapat makapagbigay ng ibang bersyon ng parehong plano, hindi ng
+            // ibang plano.
+            'selected_places' => $plan->selected_places ?? [],
         ], null, null, true);
 
         if (isset($result['error'])) {
@@ -330,8 +695,26 @@ class PlanoraService
             ];
         }
 
-        $remainingBudget = max(0, (float) $validated['budget'] - $totalHotelCost);
-        $dailyAllowance = $days > 0 ? $remainingBudget / $days : 0;
+        $dailyAllowance = self::dailyAllowanceFor($nightlyRate, (float) $validated['budget'], $days);
+
+        // REGRESSION FIX: ang tanging guard ay naglalabas lang kung bayad na ang
+        // budget sa hotel — hindi kailanman kung may natitira para mag expenses.
+        // Sa isang araw, nights = 0 kaya PHP 0 ang lodging, kaya '1 < 0' ay
+        // mali at dumaan pa rin ang PHP 1. Kailangan ng hiwalay na floor.
+        if ($dailyAllowance < self::MIN_DAILY_ALLOWANCE) {
+            $requiredTotal = $totalHotelCost + (self::MIN_DAILY_ALLOWANCE * $days);
+            $shortfall = $requiredTotal - (float) $validated['budget'];
+
+            return [
+                'error' => 'Budget too low for a real itinerary. After accommodation you have about PHP '
+                    . number_format($dailyAllowance) . ' per day left, but Planora needs at least PHP '
+                    . number_format(self::MIN_DAILY_ALLOWANCE)
+                    . '/day — one meal plus tricycle fares. For ' . $days . ' day(s) that means PHP '
+                    . number_format($requiredTotal) . ' in total. Please add PHP '
+                    . number_format($shortfall) . ' to your budget, or pick a cheaper stay.',
+            ];
+        }
+
         $foodBudgetPerDay = round($dailyAllowance * 0.6);
         $activityBudgetPerDay = round($dailyAllowance * 0.4);
 
@@ -350,7 +733,11 @@ class PlanoraService
             $nearbyPlaces = $this->describeNearbyPlaces($hotel);
         }
 
-        $poiList = $this->capNearbyPlaces($nearbyPlaces, 10);
+        // Ang mga pinili ng traveller sa Step 03. Nililista muna sila bago ang
+        // Overpass listahan kasi doon pinuputol mula sa dulo.
+        $selectedPlaceLabels = $this->selectedPlaceLabels($validated['selected_places'] ?? []);
+        $combinedPlaces = $this->prependPlaces($nearbyPlaces, $selectedPlaceLabels);
+        $poiList = $this->allowedPlacesForPrompt($combinedPlaces, $selectedPlaceLabels);
 
         $prompt = $this->buildAiPrompt(
             $validated,
@@ -361,7 +748,8 @@ class PlanoraService
             $activityBudgetPerDay,
             $weatherDesc,
             $poiList,
-            $restInstruction
+            $restInstruction,
+            $selectedPlaceLabels
         );
 
         $apiKey = config('services.groq.key');
@@ -369,6 +757,8 @@ class PlanoraService
         $aiProvider = empty($recommendation) ? 'local' : 'groq';
 
         if (empty($recommendation)) {
+            // Ang parehong listahan ang ipinapasa sa local generator, kaya hindi
+            // nagiging "offline mode" na tulad ng AI ang dating picks ng traveller.
             $recommendation = $this->generateLocalFallbackItinerary(
                 $validated, $restList, $wholeRestDayIndex,
                 [
@@ -376,7 +766,8 @@ class PlanoraService
                     'foodBudgetPerDay' => $foodBudgetPerDay,
                     'activityBudgetPerDay' => $activityBudgetPerDay,
                 ],
-                $nearbyPlaces
+                $combinedPlaces,
+                $selectedPlaceLabels
             );
         }
 
@@ -390,6 +781,9 @@ class PlanoraService
             'daily_allowance' => round($dailyAllowance),
             'nights' => $nights,
             'ai_provider' => $aiProvider,
+            // Ibinabalik para maisama sa Plan::create() at para magamit ng
+            // browser ang parehong listahan sa map pins.
+            'selected_places' => $selectedPlaceLabels,
         ];
     }
 
@@ -439,10 +833,9 @@ class PlanoraService
         }
 
         $categorized = $this->getNearbyPlaces((float) $hotel->lat, (float) $hotel->lon);
-        $labels = ['restaurant' => 'Restaurant', 'mall' => 'Mall', 'beach' => 'Beach', 'tourist' => 'Tourist Spot'];
         $names = [];
 
-        foreach ($labels as $type => $label) {
+        foreach (self::PLACE_CATEGORY_LABELS as $type => $label) {
             foreach ($categorized[$type] ?? [] as $place) {
                 if (!empty($place['name'])) {
                     $names[] = $place['name'] . ' (' . $label . ')';
@@ -714,7 +1107,8 @@ class PlanoraService
         int $activityBudgetPerDay,
         ?string $weatherDesc,
         string $poiList,
-        string $restInstruction
+        string $restInstruction,
+        array $selectedPlaceLabels = []
     ): string {
         $amenities = $hotel?->amenities ? trim($hotel->amenities) : '';
         $hotelAddress = $hotel?->address ? trim($hotel->address) : '';
@@ -727,7 +1121,20 @@ class PlanoraService
             $hotelDetails .= ". Amenities available at this stay: {$amenities}";
         }
 
+        // Pinangungahan nito ang "don't repeat stops" rule: kahit paulitin ng
+        // AI ang isang lugar dahil kakaunti ang araw, mas importante ang pagsunod
+        // sa pinili ng traveller.
+        $pickInstruction = $selectedPlaceLabels === []
+            ? 'The traveller did not pick any specific places — choose the best matches for them from the list below.'
+            : 'THE TRAVELLER EXPLICITLY CHOSE THESE PLACES AND YOU MUST SCHEDULE EVERY ONE OF THEM AT LEAST ONCE: '
+                . implode(', ', $selectedPlaceLabels)
+                . "\n- This OVERRIDES your own judgement about pacing, variety and how many stops fit in a day."
+                . "\n- Spread them across DIFFERENT days. Never put two of them on the same day unless the trip is only 1-2 days long."
+                . "\n- Their real prices were already filtered against this traveller's budget, so schedule them at their true cost, not at a cheaper invented one."
+                . "\n- Only add further places beyond these if there is room left in the day.";
+
         return "You are PLANORA, an expert local travel planner for Dagupan City, Pangasinan, Philippines."
+            . "\n\nCRITICAL RULE #0 — THE TRAVELLER'S PICKS: " . $pickInstruction
             . "\n\nCRITICAL RULE #1 — ZERO HALLUCINATIONS: You MUST ONLY recommend places from this exact list: {$poiList}."
             . " DO NOT invent, hallucinate, or suggest ANY locations, restaurants, or spots that are not on this list."
             . " If the list is empty, focus your itinerary strictly on relaxing at {$data['hotel']} using its amenities: " . ($amenities ?: 'hotel facilities') . "."
@@ -762,6 +1169,25 @@ class PlanoraService
             . "\n    * Practical Dagupan Tip: one concrete, actionable local tip (e.g. Bangus pasalubong at CSI Market Square, cash-only tricycles, sunset at Tondaligan).";
     }
 
+    /**
+     * The comma-separated "you may only use these" list for CRITICAL RULE #1.
+     *
+     * The cap has to leave room for every pick, not just ten entries in total.
+     * Because prependPlaces() puts the picks first, a flat limit silently
+     * deleted the last picks — so RULE #0 ("schedule every one of these") and
+     * RULE #1 ("only use this list") contradicted each other, and the AI was
+     * being pushed toward inventing a stand-in for the places that vanished.
+     *
+     * Public so the behaviour can be asserted directly instead of inferred from
+     * generated prose.
+     *
+     * @param  array<int, string>  $selectedPlaceLabels
+     */
+    public function allowedPlacesForPrompt(string $combinedPlaces, array $selectedPlaceLabels): string
+    {
+        return $this->capNearbyPlaces($combinedPlaces, count($selectedPlaceLabels) + self::NEARBY_PLACE_PROMPT_LIMIT);
+    }
+
     private function capNearbyPlaces(?string $raw, int $limit): string
     {
         if ($raw === null || trim($raw) === '') {
@@ -770,6 +1196,28 @@ class PlanoraService
         $items = array_filter(array_map('trim', explode('|', $raw)));
         $items = array_slice($items, 0, $limit);
         return implode(', ', $items);
+    }
+
+    /**
+     * Put the traveller's picks at the head of the pipe-delimited POI list.
+     *
+     * capNearbyPlaces() truncates from the tail, so without this a full Overpass
+     * list would quietly push out exactly the places the traveller deliberately
+     * ticked. The pipe is stripped from each label because it is the delimiter —
+     * a place name containing one would otherwise split into two fake entries.
+     */
+    private function prependPlaces(?string $nearbyPlaces, array $selectedPlaceLabels): string
+    {
+        if ($selectedPlaceLabels === []) {
+            return (string) $nearbyPlaces;
+        }
+
+        $picks = implode('|', array_map(
+            fn (string $label) => str_replace('|', ' ', $label),
+            $selectedPlaceLabels
+        ));
+
+        return trim((string) $nearbyPlaces) === '' ? $picks : $picks . '|' . $nearbyPlaces;
     }
 
     private function resolveWholeRestDay(array $restList, int $days): ?int
@@ -890,7 +1338,7 @@ class PlanoraService
         return false;
     }
 
-    private function generateLocalFallbackItinerary(array $data, array $restList, ?int $wholeRestDayIndex, array $budget, ?string $poiString = ''): string
+    private function generateLocalFallbackItinerary(array $data, array $restList, ?int $wholeRestDayIndex, array $budget, ?string $poiString = '', array $selectedPlaceLabels = []): string
     {
         $hotel = $data['hotel'];
         $days = $data['days'];
@@ -915,6 +1363,10 @@ class PlanoraService
         $markdown = "### Trip Overview\n";
         $markdown .= "- **{$hotel}**, PHP " . number_format($budget['nightlyRate']) . "/night for {$days} day(s) — total budget PHP " . number_format($totalBudget) . ".\n";
         $markdown .= "- Daily allowance after hotel: ~PHP " . number_format($budget['foodBudgetPerDay'] + $budget['activityBudgetPerDay']) . " (food + activities).\n";
+
+        if ($selectedPlaceLabels !== []) {
+            $markdown .= "- Your picks, locked in: " . implode(', ', $selectedPlaceLabels) . ".\n";
+        }
 
         if (!empty($timedRest)) {
             $markdown .= "\n### Rest Schedule (daily)\n";
