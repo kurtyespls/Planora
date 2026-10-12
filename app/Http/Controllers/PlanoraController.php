@@ -66,7 +66,67 @@ class PlanoraController extends Controller
                 'maxTripBudget' => PlanoraService::MAX_TRIP_BUDGET,
             ]);
         }
-        return view('welcome');
+
+        return view('welcome', [
+            // Ang buong katalogong ginagamit ng Step 03 "Pick your places"
+            // picker — iyon din ang laman ng "A city full of stories" gallery,
+            // kaya pareho ang makikita ng bisita sa landing page at ng traveller
+            // sa planner.
+            'galleryPlaces' => $this->galleryPlaces(),
+        ]);
+    }
+
+    /**
+     * Ang locations-katalogo (restaurante, mall, beach, tourist spots) na
+     * handa nang i-render ng landing-page gallery.
+     *
+     * Parehong fallback sa PlanoraService::getBudgetFriendlyPlaces(): kapag
+     * walang sariling larawan ang lugar, ang PLACE_CATEGORY_IMAGES ang
+     * ibinabalik — walang basag na <img> sa pagdating.
+     *
+     * Hindi kailanman binabagsak ang landing page: kapag wala pang laman ang
+     * katalogo o hindi pa na-migrate ang DB, empty array ang ibinabalik at ang
+     * curated na gallery sa loob ng welcome.blade ang pumapalit.
+     */
+    private function galleryPlaces(): array
+    {
+        try {
+            $rows = Location::query()
+                ->whereIn('category', array_keys(PlanoraService::PLACE_CATEGORY_LABELS))
+                ->get(['name', 'category', 'rating', 'image_url', 'budgetPerDay', 'latitude', 'longitude']);
+        } catch (\Throwable $e) {
+            Log::warning('Landing gallery: catalogue unavailable, using curated fallback', [
+                'message' => $e->getMessage(),
+            ]);
+            return [];
+        }
+
+        // Ikaayos ayon sa pagkakasunod ng chips sa Step 03 (galing din sa
+        // PLACE_CATEGORY_LABELS), at pangalawa ay pangalan — laging pareho ang
+        // pagkakasunod kahit saan galing ang data.
+        $order = array_flip(array_keys(PlanoraService::PLACE_CATEGORY_LABELS));
+        $places = $rows->all();
+        usort($places, function (Location $a, Location $b) use ($order): int {
+            $byCategory = ($order[$a->category] ?? PHP_INT_MAX) <=> ($order[$b->category] ?? PHP_INT_MAX);
+
+            return $byCategory !== 0 ? $byCategory : strcasecmp($a->name, $b->name);
+        });
+
+        return array_map(fn (Location $place): array => [
+            'name' => $place->name,
+            'category' => $place->category,
+            // Per-place photo kapag mayroon, kundi ang category default —
+            // eksaktong gaya ng ipinapakita sa Step 03 cards.
+            'image_url' => $place->image_url
+                ?: (PlanoraService::PLACE_CATEGORY_IMAGES[$place->category] ?? null),
+            'budget_per_day' => (float) $place->budgetPerDay,
+            'rating' => (float) $place->rating,
+            // Coordinates ng marker sa map modal. Nananatiling null kapag walang
+            // laman ang column — ang view ang magde-decide kung maglalagay ng
+            // magnify button, para hindi mapunta ang marker sa (0, 0).
+            'latitude' => $place->latitude,
+            'longitude' => $place->longitude,
+        ], $places);
     }
 
     public function getHotels()

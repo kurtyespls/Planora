@@ -122,6 +122,25 @@ class VisitLogController extends Controller
     }
 
     /**
+     * The current user's still-open visits, so the map can show a "Check Out"
+     * button instead of "Check In" for places they are already at.
+     */
+    public function active(Request $request)
+    {
+        $visits = VisitLog::query()
+            ->where('user_id', (int) auth()->id())
+            ->open()
+            ->orderBy('checked_in_at')
+            ->get(['location_name', 'checked_in_at'])
+            ->map(fn (VisitLog $visit) => [
+                'location_name' => $visit->location_name,
+                'checked_in_at' => $visit->checked_in_at->toIso8601String(),
+            ]);
+
+        return response()->json(['visits' => $visits]);
+    }
+
+    /**
      * The still-open visit for this user at this place, if any.
      */
     private function openVisit(int $userId, string $name): ?VisitLog

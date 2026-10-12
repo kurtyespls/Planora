@@ -407,12 +407,29 @@
         .map-legend span:hover { transform: translateY(-1px); }
         .legend-dot { width: 10px; height: 10px; border-radius: 999px; display: inline-block; box-shadow: 0 0 0 2px rgba(0,0,0,0.1); }
 
+        /* —— AI itinerary overflow safety (all widths) —— */
+        /* AI markdown puwedeng maglaman ng mahabang URL, table o code block na
+           sumisira sa mobile kung walang wrap at scroll. */
+        #ai-output, #ai-output .day-body, .markdown-body { overflow-wrap: break-word; }
+        #ai-output table, .markdown-body table { display: block; max-width: 100%; overflow-x: auto; }
+        #ai-output img, #ai-output pre, .ai-output pre, .markdown-body img, .markdown-body pre { max-width: 100%; overflow-x: auto; }
+
         /* —— Responsive utilities —— */
         @media (max-width: 640px) {
             .hotel-card-enter { animation: none; }
             .step.active { animation: none; }
             .ticket-frame { padding: 1rem; }
             #map { height: 320px; }
+            .stub-node { width: 30px; height: 30px; font-size: 0.62rem; }
+            .stub-line { margin: 0 4px; }
+            .planner-hero h1 { font-size: 2.35rem; }
+            .planner-hero { padding: 16px 0 12px; }
+            .toast { max-width: calc(100vw - 2rem); }
+        }
+
+        /* Short viewports (landscape phones): shrink the map so the form stays reachable */
+        @media (max-height: 520px) {
+            #map { height: 260px; }
         }
 
         /* —— Touch device optimizations —— */
@@ -782,6 +799,27 @@
                     </div>
                 </div>
 
+                <!-- Guided arrival / check-in / check-out card.
+                     Lumalabas kapag nakarating (≤200 m) ang traveller sa aktibong
+                     stop ng kanyang itinerary: Check In → live timer → Check Out.
+                     Nasa labas ito ng map container, kaya may sariling delegated
+                     click listener (tingnan ang arrivalCardEl.addEventListener). -->
+                <div id="arrival-card" class="hidden mb-3 p-3.5 rounded-xl border border-[var(--line)] bg-[var(--card)] shadow-sm">
+                    <div class="flex items-start sm:items-center gap-3">
+                        <div id="arrival-icon" class="w-9 h-9 rounded-full bg-[var(--ember)] flex items-center justify-center text-white font-mono font-bold text-xs shrink-0 shadow-sm">
+                            &#9679;
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="text-xs font-bold text-[var(--ink)] flex items-center gap-1.5 flex-wrap">
+                                <span id="arrival-title">You've arrived</span>
+                                <span id="arrival-progress" class="inline-block px-1.5 py-0.5 rounded text-[0.62rem] font-mono font-semibold bg-emerald-100 text-emerald-800"></span>
+                            </div>
+                            <div id="arrival-details" class="text-xs text-[var(--ink-soft)] mt-0.5"></div>
+                            <div id="arrival-actions" class="mt-2 flex items-center gap-2 flex-wrap"></div>
+                        </div>
+                    </div>
+                </div>
+
                 <div id="map" class="mb-2 border border-[var(--line)]"></div>
                 <div id="map-legend" class="map-legend mb-6">
                     <span data-legend="hotel"><span class="legend-dot" style="background:#0B3D3A"></span>Your hotel</span>
@@ -816,7 +854,7 @@
 
                 <div id="ai-output"></div>
 
-                <button onclick="location.reload()" class="mt-6 w-full bg-transparent text-[var(--deep-teal)] border-[1.5px] border-[var(--line)] p-4 rounded-xl font-bold hover:bg-[var(--sand-deep)] transition focus-ring">
+                <button onclick="planAnotherTrip()" class="mt-6 w-full bg-transparent text-[var(--deep-teal)] border-[1.5px] border-[var(--line)] p-4 rounded-xl font-bold hover:bg-[var(--sand-deep)] transition focus-ring">
                     Plan another trip
                 </button>
             </div>
@@ -852,10 +890,10 @@
             </div>
             <div class="p-5 sm:p-6 overflow-y-auto flex-1">
                 <h3 id="modal-hotel-title" class="font-display font-semibold text-xl sm:text-2xl text-[var(--ink)] mb-2"></h3>
-                <a id="modal-address-link" href="#" target="_blank" rel="noopener" class="inline-flex items-start gap-1.5 text-sm text-[var(--ink-soft)] mb-5 pb-5 border-b border-[var(--line)] w-full hover:text-[var(--deep-teal)] transition-colors">
+                <div id="modal-address-link" class="inline-flex items-start gap-1.5 text-sm text-[var(--ink-soft)] mb-5 pb-5 border-b border-[var(--line)] w-full">
                     <span class="font-mono text-xs font-bold text-[var(--deep-teal)]" aria-hidden="true">ADDRESS</span>
                     <span id="modal-address-text"></span>
-                </a>
+                </div>
                 <h4 class="font-medium text-sm text-[var(--ink)] mb-3 flex items-center gap-2">
                     <span class="font-mono text-xs font-bold text-[var(--deep-teal)]" aria-hidden="true">AMENITIES</span> Available Amenities
                 </h4>
@@ -869,6 +907,26 @@
                 <button onclick="selectFromModal()" class="btn-primary focus-ring w-full sm:w-auto px-6 py-3 rounded-xl font-bold whitespace-nowrap">
                     Select this hotel
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="place-photo-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 opacity-0 transition-opacity duration-300" role="dialog" aria-modal="true" aria-labelledby="place-photo-title">
+        <div class="bg-[var(--card)] w-full max-w-2xl max-h-[90vh] rounded-2xl overflow-hidden shadow-2xl transform scale-95 transition-transform duration-300 flex flex-col" id="place-photo-modal-content">
+            <div class="relative bg-black flex-shrink-0 flex items-center justify-center min-h-[240px] max-h-[70vh]">
+                <img id="place-photo-img" src="" alt="" class="w-full max-h-[70vh] object-contain">
+                <button type="button" onclick="closePlacePhoto()" class="absolute top-3 right-3 bg-black/50 text-white w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/80 transition" aria-label="Close photo viewer">×</button>
+            </div>
+            <div class="p-5 sm:p-6 overflow-y-auto flex-1">
+                <h3 id="place-photo-title" class="font-display font-semibold text-xl sm:text-2xl text-[var(--ink)] mb-1"></h3>
+                <p id="place-photo-meta" class="font-mono text-xs text-[var(--sage)] mb-2"></p>
+                <p id="place-photo-desc" class="text-sm text-[var(--ink-soft)] leading-relaxed"></p>
+                <!-- Lokasyon ng lugar sa mapa (tulad ng landing gallery). Naka-hide
+                     kapag walang koordinado ang lugar. -->
+                <div id="place-photo-map-wrap" class="mt-4 hidden">
+                    <div id="place-photo-map" style="height:260px;border-radius:0.75rem;overflow:hidden;border:1px solid var(--line);"></div>
+                    <p class="font-mono text-xs text-[var(--sage)] mt-2">Location · Dagupan City</p>
+                </div>
             </div>
         </div>
     </div>
@@ -921,6 +979,14 @@
         // kung alin lang sa kanila ang totoong sinuggest, at ang
         // `renderSuggestedPlaces()` lang ang naglalagay ng markers.
         let nearbyPlacesIndex = [];
+        // Bukas na pag-check-in ng user (location_name → checked_in_at ISO). Ginagamit
+        // ng POI popup para magpakita ng "Check Out" kapag naka-check-in na, at
+        // ina-update pagkatapos ng bawat aksyon.
+        let activeVisits = {};
+        // Marker registry (location_name → Leaflet marker) para ma-refresh ang
+        // popup button matapos ang check-in/check-out nang hindi nagre-render ulit
+        // ng buong pin.
+        let poiMarkers = {};
         let currentHotelPrice = 0;
         let allHotels = [];
 
@@ -1063,22 +1129,283 @@
             }
         }
 
-        // REGRESSION FIX: noong nag-r-restore kami ng dating napiling hotel sa
-        // load, binabaso namin ang sessionStorage at tinatawag ang
-        // selectHotel() — na siyang naglilipat sa Step 02.
-        //
-        // Problema: ang hotel lang ang na-restore. Ang budget, ang bilang ng araw
-        // at ang rest schedule ay wala — kaya napupunta ang traveller sa Step 02
-        // na halos walang laman, walang "#budget-hint", at tuloy sa kanyang
-        // kagustuhan na "nastuck" doon. Kung ginawa namin itong buo, Okay; pero
-        // hindi, kaya ang malinaw at hindi nakakagulat ang pagbalik sa Step 01.
-        //
-        // Ang pag-restore ng buong draft ay isang hiwalay na feature, hindi
-        // bootstrap na dapat nasa landas ng unang bug.
-        sessionStorage.removeItem('planora_selected_idx');
+        // REGRESSION NOTE: dati ay `sessionStorage.removeItem()` sa load — kaya
+        // laging Step 01 pag refresh. Ngayon ay full draft ang nire-restore nang
+        // may validation (tingnan ang restorePlannerDraft): ang hotel lang na
+        // walang budget/days/rest ang nagdudulot ng "stuck sa Step 02", at ang
+        // guarded restore ang pumipigil doon. Kasama na rin ngayon ang Step 04:
+        // kapag may naka-save na itinerary sa draft, doon mismo ibinabalik ang
+        // traveller (tingnan ang restoreItineraryStep) imbes na sa Step 03.
 
-        document.addEventListener('DOMContentLoaded', () => {
-            fetchHotels();
+        // —— Planner draft (refresh-safe) ——
+        // Dati: `sessionStorage.removeItem()` sa load — kaya laging Step 01 pag
+        // refresh. Ngayon: sine-save ang buong draft at nire-restore nang may
+        // validation, para hindi maulit ang "stuck sa Step 02 na walang laman".
+        const PLANNER_DRAFT_KEY = 'planora_draft_v1';
+
+        function currentStepNumber() {
+            for (let i = 1; i <= TOTAL_STEPS; i++) {
+                if (document.getElementById(`step-${i}`)?.classList.contains('active')) return i;
+            }
+            return 1;
+        }
+
+        function goToStep(stepNum) {
+            for (let i = 1; i <= TOTAL_STEPS; i++) {
+                document.getElementById(`step-${i}`)?.classList.toggle('active', i === stepNum);
+            }
+            setActiveStub(stepNum);
+            savePlannerDraft();
+        }
+
+        function savePlannerDraft() {
+            try {
+                const daysEl = document.getElementById('trip-days');
+                const budgetEl = document.getElementById('trip-budget');
+                sessionStorage.setItem(PLANNER_DRAFT_KEY, JSON.stringify({
+                    step: currentStepNumber(),
+                    hotelIdx: selectedHotelIdx,
+                    hotelName: hotelName || '',
+                    days: daysEl ? daysEl.value : '',
+                    budget: budgetEl ? budgetEl.value : '',
+                    rest: collectRestWindows(),
+                    picks: [...selectedPlaces],
+                    filter: activePlaceFilter,
+                    // —— Step 04 restore ——
+                    // Dati ay DOM + `currentItineraryMarkdown` lang ang hawak ng
+                    // itinerary, kaya pagkatapos ng refresh ay wala nang maibalik
+                    // at laging Step 03 ang bagsak. Ngayon kasama na sa draft ang
+                    // markdown at ang meta (provider, allowance, budget warning,
+                    // tunay na napili) para buo ang Step 04 na walang bagong
+                    // bayad na AI call. Maliliit lang ang mga ito (KBs), kaya
+                    // kasya pa rin sa sessionStorage — at nasa try/catch pa rin
+                    // ang quota.
+                    itinerary: currentItineraryMarkdown,
+                    itineraryMeta: lastItineraryMeta,
+                    // —— Guided-trip restore ——
+                    // Kasama ang naitayong stops at kung saan index natigil ang
+                    // traveller, para pagkatapos ng refresh ay doon mismo
+                    // magpatuloy ang arrival/check-in flow.
+                    tripStops: tripStops,
+                    activeStopIndex: activeStopIndex,
+                    savedAt: Date.now(),
+                }));
+            } catch (error) {
+                // Quota o private mode — hindi ito dapat makasira sa planner.
+            }
+        }
+
+        function clearPlannerDraft() {
+            try {
+                sessionStorage.removeItem(PLANNER_DRAFT_KEY);
+                sessionStorage.removeItem('planora_selected_idx');
+            } catch (error) {
+                // Balewalain — parehong dahilan sa itaas.
+            }
+        }
+
+        // Explicit reset lang ang nagbubura ng draft — hindi ang refresh.
+        function planAnotherTrip() {
+            clearPlannerDraft();
+            stopUserTracking();
+            location.reload();
+        }
+
+        function readPlannerDraft() {
+            try {
+                const raw = sessionStorage.getItem(PLANNER_DRAFT_KEY);
+                if (!raw) return null;
+                const draft = JSON.parse(raw);
+                return (draft && typeof draft === 'object') ? draft : null;
+            } catch (error) {
+                return null;
+            }
+        }
+
+        function isValidClock(value) {
+            return typeof value === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+        }
+
+        // Guarded restore: bawat bahagi ay vine-validate bago i-apply. Kapag may
+        // hindi tugma (hal. wala na ang hotel sa listahan), bumabalik sa
+        // pinakamataas na step na may valid na prereqs — hindi sa sirang step.
+        async function restorePlannerDraft() {
+            const draft = readPlannerDraft();
+            if (!draft) return;
+            const step = Number.isInteger(draft.step) && draft.step >= 1 && draft.step <= TOTAL_STEPS ? draft.step : 1;
+            if (step === 1) return;
+            let idx = Number.isInteger(draft.hotelIdx) && allHotels[draft.hotelIdx]?.name === draft.hotelName
+                ? draft.hotelIdx
+                : allHotels.findIndex(h => h && h.name === draft.hotelName);
+            if (idx < 0) {
+                if (allHotels.length > 0) {
+                    // Loaded ang listahan pero wala na talaga ang hotel (tinanggal
+                    // o binago ang pangalan) — sirang draft na ito.
+                    clearPlannerDraft();
+                } else {
+                    // Hindi dapat mabura ang draft dahil lang bumagsak ang
+                    // /api/hotels. Ipinapakita ang problema at binabura lang
+                    // talaga kapag loaded na ang listahan.
+                    showToast('We could not load the hotels just now — your draft is kept. Please refresh to try again.', 'warning', 6000);
+                }
+                return;
+            }
+            applyHotelSelection(idx, { silent: true });
+            const daysEl = document.getElementById('trip-days');
+            const budgetEl = document.getElementById('trip-budget');
+            if (daysEl && draft.days !== undefined) daysEl.value = draft.days;
+            if (budgetEl && draft.budget !== undefined) budgetEl.value = draft.budget;
+            const container = document.getElementById('rest-windows');
+            if (container) {
+                container.innerHTML = '';
+                const windows = Array.isArray(draft.rest) ? draft.rest.slice(0, MAX_REST_WINDOWS) : [];
+                windows.forEach(value => {
+                    const parts = String(value || '').split('-');
+                    if (isValidClock(parts[0]) && isValidClock(parts[1])) addRestWindow(parts[0], parts[1]);
+                });
+                if (container.children.length === 0) addRestWindow();
+                else syncRestControls();
+            }
+            checkBudget();
+            if (readTripDays() === null || readTripBudget() === null) {
+                goToStep(2);
+                showToast('Welcome back — please check your trip details to continue.', 'info');
+                return;
+            }
+            selectedPlaces = Array.isArray(draft.picks) ? draft.picks.filter(n => typeof n === 'string') : [];
+            if (['all', 'restaurant', 'mall', 'tourist', 'beach'].includes(draft.filter)) {
+                activePlaceFilter = draft.filter;
+            }
+            if (step === 2) {
+                goToStep(2);
+                return;
+            }
+            if (step >= 4 && typeof draft.itinerary === 'string' && draft.itinerary.trim() !== '') {
+                // Buong Step 04: may naka-save na itinerary sa draft, kaya
+                // hindi ito binabagsak sa Step 03. Walang auto-generate — ang
+                // session copy ang binabasa, hindi ang AI.
+                await restoreItineraryStep(draft);
+                return;
+            }
+            goToStep(3);
+            await loadPlaceOptions();
+            renderPlaceCards();
+            updatePlaceSummary();
+            if (step >= 4) {
+                // Walang auto-generate sa refresh: magastos ang AI call at hindi
+                // inaasahan ng traveller. Buo ang picks — isang pindot na lang
+                // sa "Generate itinerary" para tumuloy. Dito ka mapupunta kapag
+                // na-refresh HABANG ongoing pa ang generation — wala pang
+                // itinerary na nai-save sa draft.
+                showToast('Welcome back — your picks are restored. Hit Generate itinerary when ready.', 'info');
+            }
+        }
+
+        // Step 04 restore: ang draft ang may hawak ng itinerary (markdown +
+        // meta), kaya hindi na kailangang ulitin ang bayad na AI call. Buo ang
+        // mapa, ang header card, ang budget warning, at ang mga pin pagkatapos
+        // ng refresh — kasing-laman ng noong ginenerate ito.
+        async function restoreItineraryStep(draft) {
+            const meta = (draft.itineraryMeta && typeof draft.itineraryMeta === 'object')
+                ? draft.itineraryMeta
+                : {};
+
+            // Bago ang goToStep(4): ang goToStep ay nagse-save ng draft, at ang
+            // save ay kumukuha ng `currentItineraryMarkdown`. Kung hindi ito
+            // itinakda muna, walang laman ang maisasave at sa susunod na
+            // refresh ay Step 03 na naman ang bagsak.
+            currentItineraryMarkdown = draft.itinerary;
+            lastItineraryMeta = meta;
+
+            goToStep(4);
+            document.getElementById('map').style.display = 'block';
+            initMap();
+
+            renderItinerary(draft.itinerary, meta);
+
+            const warningBox = document.getElementById('budget-warning-box');
+            if (warningBox) {
+                if (meta.budget_warning) {
+                    warningBox.innerText = meta.budget_warning;
+                    warningBox.classList.remove('hidden');
+                } else {
+                    warningBox.classList.add('hidden');
+                }
+            }
+
+            // Dalawang catalogue ang kailangan ng pins: ang POI index ay galing
+            // sa Overpass (fetchNearbyAmenities), ang mga napili ay hinahanap sa
+            // placeOptions (loadPlaceOptions → findPlace). Parehong nasa loob ng
+            // try/catch ang bawat isa, at may `.catch()` din dito — kaya kahit
+            // may bumagsak ay hindi mabigo ang restore; hotel + itinerary pa rin
+            // ang makikita.
+            await Promise.all([
+                loadPlaceOptions().catch(() => {}),
+                fetchNearbyAmenities(selectedLat, selectedLon).catch(() => {}),
+            ]);
+            renderSuggestedPlaces();
+            const picks = (Array.isArray(meta.selected_places) && meta.selected_places.length)
+                ? meta.selected_places
+                : (Array.isArray(draft.picks) ? draft.picks : []);
+            renderPickedPlaces(picks);
+
+            // Ibalik ang guided-trip stops at ire-store ang naka-save na
+            // activeStopIndex (kung saan natigil ang traveller bago mag-refresh),
+            // at ikabit ang arrival-card listener.
+            buildTripStops();
+            if (Number.isInteger(draft.activeStopIndex) && draft.activeStopIndex >= 0
+                && draft.activeStopIndex < tripStops.length) {
+                activeStopIndex = draft.activeStopIndex;
+            }
+            bindArrivalCardListener();
+
+            showToast('Welcome back — your itinerary was restored.', 'success');
+        }
+
+        // Hotel apply nang walang transition side-effect — ang restore flow ang
+        // may kontrol ng step jump, hindi ang selectHotel.
+        function applyHotelSelection(idx, options = {}) {
+            const hotel = allHotels[idx];
+            if (!hotel) return false;
+            selectedHotelIdx = idx;
+            hotelName = hotel.name;
+            selectedLat = hotel.lat || 16.0438;
+            selectedLon = hotel.lon || 120.3331;
+            selectedHotelGeocoded = Number.isFinite(Number(hotel.lat)) && Number.isFinite(Number(hotel.lon));
+            currentHotelPrice = Number(hotel.price);
+            document.getElementById('display-selected-hotel').innerText = hotel.name;
+            const imgEl = document.getElementById('selected-hotel-image');
+            imgEl.src = hotel.image_url;
+            imgEl.alt = hotel.name;
+            setupBlurIn(imgEl);
+            document.getElementById('selected-hotel-stars').innerText = starsFromRating(hotel.rating);
+            document.getElementById('selected-hotel-rating').innerText = Number(hotel.rating).toFixed(1) + ' / 10';
+            document.getElementById('selected-hotel-description').innerText = `Rate: ₱${formatPrice(hotel.price)} / night`;
+            if (!options.silent) {
+                goToStep(2);
+                checkBudget();
+            }
+            return true;
+        }
+
+        function wireDraftTracking(debouncedDraft) {
+            const container = document.getElementById('rest-windows');
+            if (container && !container.dataset.draftWired) {
+                container.dataset.draftWired = '1';
+                container.addEventListener('input', debouncedDraft);
+                container.addEventListener('click', debouncedDraft);
+            }
+            document.querySelectorAll('[data-rest-preset]').forEach(button => {
+                if (button.dataset.draftWired) return;
+                button.dataset.draftWired = '1';
+                button.addEventListener('click', debouncedDraft);
+            });
+            document.getElementById('btn-add-rest')?.addEventListener('click', debouncedDraft);
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const debouncedDraft = debounce(savePlannerDraft, 300);
+            await fetchHotels();
 
             // No more silent degradation: if there is no AI key, say so instead of
             // letting the built-in planner pass itself off as an AI itinerary.
@@ -1086,10 +1413,12 @@
                 showToast('Offline mode — itineraries come from the built-in planner. Add a GROQ_API_KEY for AI itineraries.', 'info', 7000);
             }
 
-            const debouncedCheck = debounce(checkBudget, 200);
+            const debouncedCheck = debounce(() => { checkBudget(); savePlannerDraft(); }, 200);
             document.getElementById('trip-days').addEventListener('input', debouncedCheck);
             document.getElementById('trip-budget').addEventListener('input', debouncedCheck);
             initRestWindows();
+            wireDraftTracking(debouncedDraft);
+            await restorePlannerDraft();
         });
 
         function setActiveStub(stepNum) {
@@ -1161,30 +1490,8 @@
         }
 
         function selectHotel(idx) {
-            const hotel = allHotels[idx];
-            if (!hotel) return;
-            selectedHotelIdx = idx;
-            hotelName = hotel.name;
-            // Ang fallback na 16.0438/120.3331 ay para lang sa mapa — kapag
-            // wala pa sa hotel ang tunay na coordinates, ipinapadala pa rin natin
-            // ito kaya hindi natin malalaman kung ang "pinakamalapit" ay totoo.
-            selectedLat = hotel.lat || 16.0438;
-            selectedLon = hotel.lon || 120.3331;
-            selectedHotelGeocoded = Number.isFinite(Number(hotel.lat)) && Number.isFinite(Number(hotel.lon));
-            currentHotelPrice = Number(hotel.price);
-            document.getElementById('display-selected-hotel').innerText = hotel.name;
-            const stars = starsFromRating(hotel.rating);
-            const ratingText = Number(hotel.rating).toFixed(1) + ' / 10';
-            const imgEl = document.getElementById('selected-hotel-image');
-            imgEl.src = hotel.image_url;
-            imgEl.alt = hotel.name;
-            setupBlurIn(imgEl);
-            document.getElementById('selected-hotel-stars').innerText = stars;
-            document.getElementById('selected-hotel-rating').innerText = ratingText;
-            document.getElementById('selected-hotel-description').innerText = `Rate: ₱${formatPrice(hotel.price)} / night`;
-            document.getElementById('step-1').classList.remove('active');
-            document.getElementById('step-2').classList.add('active');
-            setActiveStub(2);
+            if (!applyHotelSelection(idx)) return;
+            goToStep(2);
             checkBudget();
         }
 
@@ -1266,9 +1573,7 @@
         function goBackToStep1() {
             // Wala nang mapa sa Step 1, kaya itigil na ang GPS watch.
             stopUserTracking();
-            document.getElementById('step-2').classList.remove('active');
-            document.getElementById('step-1').classList.add('active');
-            setActiveStub(1);
+            goToStep(1);
         }
 
         // —— Step 03: ang place picker ——
@@ -1357,6 +1662,7 @@
                     activePlaceFilter = button.dataset.placeFilter;
                     renderPlaceFilters();
                     renderPlaceCards();
+                    savePlannerDraft();
                 });
             });
         }
@@ -1374,32 +1680,67 @@
                 const distance = Number.isFinite(km)
                     ? `<span class="font-mono text-[0.65rem] text-[var(--sage)]">${km < 1 ? `${Math.round(km * 1000)}m` : `${km.toFixed(1)}km`}</span>`
                     : '';
+                // Per-place photo mula sa /api/places (image_url), may category
+                // fallback kapag null (tingnan ang PlanoraService). Ang onerror
+                // ay nagtatago ng sirang <img> (pati zoom button) para emoji
+                // icon ang matira.
+                const photo = place.image_url
+                    ? `<img class="place-card-photo" src="${escapeHtml(place.image_url)}" alt="${escapeHtml(place.name)}" loading="lazy" onerror="this.parentElement?.querySelector('[data-zoom-btn]')?.remove();this.remove()">`
+                    : '';
+                const zoomBtn = place.image_url
+                    ? `<button type="button" class="place-zoom-btn" data-zoom-btn data-zoom-name="${escapeHtml(place.name)}" aria-label="View larger photo of ${escapeHtml(place.name)}" title="View larger photo">⤢</button>`
+                    : '';
 
                 return `
-                    <button type="button" class="place-card ${selected ? 'is-selected' : ''}"
+                    <article class="place-card ${selected ? 'is-selected' : ''}" role="button" tabindex="0"
                             data-place-name="${escapeHtml(place.name)}" data-place-category="${place.category}"
                             aria-pressed="${selected}">
+                        <span class="place-card-media">
+                            ${photo}
+                            ${zoomBtn}
+                            <span class="place-card-badge place-card-badge-float" style="border-color:${meta.dot}22;color:${meta.dot};background:rgba(255,255,255,.92);">
+                                <span class="place-dot" style="background:${meta.dot};"></span>${escapeHtml(meta.label)}
+                            </span>
+                            <span class="place-card-check place-card-check-float" aria-hidden="true">${selected ? '✓' : ''}</span>
+                        </span>
                         <span class="place-card-top">
                             <span class="place-card-icon" aria-hidden="true">${escapeHtml(place.icon)}</span>
                             <span class="place-card-title">${escapeHtml(place.name)}</span>
-                            <span class="place-card-check" aria-hidden="true">${selected ? '✓' : ''}</span>
                         </span>
                         <span class="place-card-desc">${escapeHtml(place.description)}</span>
                         <span class="place-card-meta">
-                            <span class="place-card-badge" style="border-color:${meta.dot}22;color:${meta.dot};">
-                                <span class="place-dot" style="background:${meta.dot};"></span>${escapeHtml(meta.label)}
-                            </span>
                             <span class="font-mono text-xs font-bold text-[var(--deep-teal)]">₱${formatPrice(place.budget_per_day)}/day</span>
                             <span class="font-mono text-[0.65rem] text-[var(--sage)]">${share}% of allowance</span>
                             <span class="text-[var(--ink-soft)] text-xs">★ ${Number(place.rating).toFixed(1)}</span>
                             ${distance}
                         </span>
-                    </button>
+                    </article>
                 `;
             }).join('');
 
             list.querySelectorAll('[data-place-name]').forEach(card => {
-                card.addEventListener('click', () => togglePlace(card.dataset.placeName, card.dataset.placeCategory));
+                card.addEventListener('click', (event) => {
+                    // Ang zoom button ay nasa loob ng card — huwag i-toggle ang
+                    // selection kapag photo viewer ang pinindot.
+                    if (event.target.closest('[data-zoom-btn]')) return;
+                    togglePlace(card.dataset.placeName, card.dataset.placeCategory);
+                });
+                // <article role="button">: ibalik ang keyboard support na libre
+                // sa dating <button>.
+                card.addEventListener('keydown', (event) => {
+                    if (event.target.closest('[data-zoom-btn]')) return;
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        togglePlace(card.dataset.placeName, card.dataset.placeCategory);
+                    }
+                });
+            });
+
+            list.querySelectorAll('[data-zoom-btn]').forEach(btn => {
+                btn.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    openPlacePhoto(btn.dataset.zoomName, btn);
+                });
             });
 
             renderPlaceEmptyState();
@@ -1461,12 +1802,14 @@
 
             renderPlaceCards();
             updatePlaceSummary();
+            savePlannerDraft();
         }
 
         function clearPlaceSelection() {
             selectedPlaces = [];
             renderPlaceCards();
             updatePlaceSummary();
+            savePlannerDraft();
             showToast('Cleared — the AI will choose for you.', 'info');
         }
 
@@ -1666,17 +2009,13 @@
                 return;
             }
 
-            document.getElementById('step-2').classList.remove('active');
-            document.getElementById('step-3').classList.add('active');
-            setActiveStub(3);
+            goToStep(3);
 
             await loadPlaceOptions();
         }
 
         function goBackToStep2() {
-            document.getElementById('step-3').classList.remove('active');
-            document.getElementById('step-2').classList.add('active');
-            setActiveStub(2);
+            goToStep(2);
         }
 
         // —— Rest schedule: ang traveller mismo ang pumipili ng oras ng rest ——
@@ -1840,12 +2179,12 @@
             }
 
             toggleButtonState('btn-generate', false);
-            document.getElementById('step-3').classList.remove('active');
-            document.getElementById('step-4').classList.add('active');
-            setActiveStub(4);
+            goToStep(4);
             document.getElementById('map').style.display = 'block';
             nearbyPlacesData = [];
             nearbyPlacesIndex = [];
+            activeVisits = {};
+            poiMarkers = {};
 
             // Ang index 1 ("Checking weather…") ay hindi na ginagamit: na-resolve
             // na ng server ang kondisyon mula sa coordinates ng hotel, kaya walang
@@ -1896,6 +2235,11 @@
                 // salita — kung hindi, magmumukhang walang epekto ang picker.
                 renderSuggestedPlaces();
                 renderPickedPlaces(data.selected_places || selectedPlaces);
+                // Iayos ang guided-trip stops (hotel → sunod-sunod na napiling
+                // lugar) at ikabit ang arrival-card listener para gumana ang
+                // arrival → check-in → timer → check-out → auto-route flow.
+                buildTripStops();
+                bindArrivalCardListener();
                 const warningBox = document.getElementById('budget-warning-box');
                 if (data.budget_warning) {
                     warningBox.innerText = data.budget_warning;
@@ -1904,6 +2248,18 @@
                     warningBox.classList.add('hidden');
                 }
                 hideProgress();
+                // Ngayon may laman na ang Step 04 — itabi ang meta at i-save
+                // ang draft muli. Ang naunang save (mula sa goToStep(4)) ay
+                // wala pang itinerary; dito pa lang ito nagkakaroon, kaya dito
+                // rin dapat ito i-persist — kung hindi, babagsak pa rin sa
+                // Step 03 ang magre-refresh.
+                lastItineraryMeta = {
+                    ai_provider: data.ai_provider || 'local',
+                    daily_allowance: data.daily_allowance,
+                    budget_warning: data.budget_warning || '',
+                    selected_places: data.selected_places || selectedPlaces,
+                };
+                savePlannerDraft();
                 showToast('Your itinerary is ready!', 'success', 5000);
             })
             .catch(error => {
@@ -1917,9 +2273,7 @@
                 // Papunta sa Step 03, hindi sa 02 — ang budget guard ay
                 // tinatawag habang nasa unang await, kaya ang mga napiling
                 // lugar ay pa rin ang context na dapat makita ang error.
-                document.getElementById('step-4').classList.remove('active');
-                document.getElementById('step-3').classList.add('active');
-                setActiveStub(3);
+                goToStep(3);
             })
             .finally(() => {
                 // REGRESSION FIX: ang btn-generate ay dinidisable sa simula ng
@@ -1939,6 +2293,11 @@
         }
 
         let currentItineraryMarkdown = '';
+        // Ang huling meta na ibinabalik ng /generate-plan (provider, daily
+        // allowance, budget warning, tunay na napili). Kasama ito sa draft
+        // para maibalik ang buong Step 04 — header card, warning box, at
+        // pins — pagkatapos ng refresh nang walang bagong AI call.
+        let lastItineraryMeta = {};
 
         function renderItinerary(markdown, meta = {}) {
             currentItineraryMarkdown = markdown || '';
@@ -2114,6 +2473,20 @@
         const REROUTE_MIN_MOVE_KM = 0.12;   // ~120 m na galaw bago mag-recompute
         const REROUTE_MAX_AGE_MS = 25000;   // o 25s na pagitan — alinman ang mauna
 
+        // —— Guided trip stops (arrival → check-in → timer → check-out) ——
+        // Ang buong biyahe bilang ordered list: ang hotel ang unang stop, tapos
+        // ang mga napiling lugar sa chronological order ng itinerary. Ang
+        // `activeStopIndex` ang nagsasabi kung saan tayo ngayon.
+        let tripStops = [];
+        let activeStopIndex = 0;
+        // Ilang metro ang itinuturing na "nakarating na" sa isang stop. Sapat na
+        // malapit para sa GPS accuracy sa cellular, hindi masyadong malapit para
+        // hindi mag-trigger habang nagmamaneho pa sa kalsada.
+        const ARRIVAL_RADIUS_M = 200;
+        // Name ng stop na pinakita ngayon sa arrival card — para maiwasang
+        // mag-re-render tuwing GPS tick kapag pareho pa rin ang aktibong stop.
+        let arrivalCardShownFor = null;
+
         // Isang pin lang ang dapat lumabas sa mapa: ang module-scope na `userMarker`
         // ang source of truth, at ang `window.userMarker` ay alias para sa mga
         // legacy caller (Show My Location button).
@@ -2227,6 +2600,12 @@
 
             autoDetectAndRouteToHotel();
             startUserTracking();
+
+            // Stay duration tracker: kunin ang mga bukas na check-in para lumabas
+            // ang "Check Out" (kasama ang live timer) imbes na "Check In", at
+            // simulan ang segundo-segundong pag-update ng tagal ng pananatili.
+            loadActiveVisits();
+            startStayTimer();
         }
 
         function autoDetectAndRouteToHotel() {
@@ -2345,6 +2724,249 @@
             if (btn) btn.innerText = tracking ? 'Stop live tracking' : 'Start live tracking';
         }
 
+        // —— Guided trip: arrival → check-in → timer → check-out → auto-route ——
+        // Bumubuo ng ordered na listahan ng buong biyahe. Stop #1 ang hotel
+        // (basecamp) kung saan nagsisimula; sunod ang mga napiling lugar sa
+        // chronological order ng itinerary (kung paano binanggit). Ginagamit ang
+        // parehong coordinate catalogue at text matcher ng mga pin, kaya tugma
+        // ang stops sa nakapin sa mapa.
+        function buildTripStops() {
+            const stops = [];
+            const seen = new Set();
+            const hotelKey = normalizePlaceText(hotelName);
+
+            // Stop #1: ang hotel/basecamp.
+            if (hotelName) {
+                stops.push({ name: hotelName, lat: selectedLat, lon: selectedLon, isHotel: true });
+                seen.add(hotelKey);
+            }
+
+            // Canonical na napili mula sa meta kapag meron; kung wala, ang
+            // aktuwal na selectedPlaces.
+            const picks = (lastItineraryMeta && Array.isArray(lastItineraryMeta.selected_places) && lastItineraryMeta.selected_places.length)
+                ? lastItineraryMeta.selected_places
+                : selectedPlaces;
+
+            const itineraryText = currentItineraryText();
+
+            // Ihanay ang mga napili base sa posisyon ng unang banggit nila sa
+            // itinerary (chronological). Ang hindi nabanggit ay mananatili sa
+            // picker order nila at mapupunta sa dulo ng listahan.
+            const ordered = picks
+                .map((rawLabel, idx) => {
+                    const name = String(rawLabel).replace(/\s*\((Restaurant|Mall|Beach|Tourist Spot)\)\s*$/i, '').trim();
+                    const pos = itineraryText.indexOf(normalizePlaceText(name));
+                    return { name, pos: pos === -1 ? Number.MAX_SAFE_INTEGER : pos, idx };
+                })
+                .sort((a, b) => (a.pos - b.pos) || (a.idx - b.idx));
+
+            ordered.forEach(item => {
+                if (!item.name) return;
+                const key = normalizePlaceText(item.name);
+                if (key.length < 3 || seen.has(key)) return;
+                // Huwag idagdag ang hotel bilang stop (sariling 'H' pin na).
+                if (hotelKey.length >= 3 && (key.includes(hotelKey) || hotelKey.includes(key))) return;
+                const place = findPlace(item.name);
+                if (!place || !Number.isFinite(Number(place.lat)) || !Number.isFinite(Number(place.lon))) return;
+                seen.add(key);
+                stops.push({ name: place.name, lat: Number(place.lat), lon: Number(place.lon), isHotel: false });
+            });
+
+            tripStops = stops;
+            activeStopIndex = 0;
+            arrivalCardShownFor = null;
+            return stops;
+        }
+
+        // Ang arrival card ay nasa labas ng map container, kaya hindi ito
+        // naririnig ng handler na nakatali sa map. Parehong handler ang ginamit
+        // (data-poi-action) — isang beses lang itong ikinakabit (static markup).
+        let arrivalCardListenerBound = false;
+        function bindArrivalCardListener() {
+            if (arrivalCardListenerBound) return;
+            const arrivalCardEl = document.getElementById('arrival-card');
+            if (!arrivalCardEl) return;
+            arrivalCardEl.addEventListener('click', handlePoiActionClick);
+            arrivalCardListenerBound = true;
+        }
+
+        // Tinitingnan kung nakarating na ba ang traveller sa aktibong stop. Kapag
+        // oo, ipinapakita ang arrival card: Check In kung wala pang bukas na
+        // visit doon, o live timer + Check Out kapag naka-check-in na.
+        function checkArrival(uLat, uLon) {
+            if (!isAuthenticated) return;
+            const stop = tripStops[activeStopIndex];
+            if (!stop) return;
+
+            const distM = haversineKm(uLat, uLon, stop.lat, stop.lon) * 1000;
+            if (distM > ARRIVAL_RADIUS_M) {
+                // Umalis (o hindi pa nararating) — itago ang card kung ito ang
+                // stop na kasalukuyang pinapakita, pero huwag galawin ang timer.
+                if (arrivalCardShownFor === stop.name) hideArrivalCard();
+                return;
+            }
+
+            showArrivalCard(stop, distM);
+        }
+
+        function showArrivalCard(stop, distM) {
+            const card = document.getElementById('arrival-card');
+            if (!card) return;
+
+            const titleEl = document.getElementById('arrival-title');
+            const progressEl = document.getElementById('arrival-progress');
+            const detailsEl = document.getElementById('arrival-details');
+            const actionsEl = document.getElementById('arrival-actions');
+
+            if (titleEl) titleEl.textContent = `You've arrived at ${stop.name}`;
+            if (progressEl) progressEl.textContent = `Stop ${activeStopIndex + 1} of ${tripStops.length}`;
+
+            const since = activeVisits[stop.name];
+            if (since) {
+                // Naka-check-in na: live timer + Check Out.
+                if (detailsEl) detailsEl.innerHTML = `Checked in — enjoying <strong>${escapeHtml(stop.name)}</strong>`;
+                if (actionsEl) {
+                    actionsEl.innerHTML =
+                        `<span class="stay-duration" data-stay-since="${since}" style="font-family:'JetBrains Mono',monospace;font-size:0.8rem;font-weight:700;color:var(--deep-teal);">${formatStayDuration(since)}</span>`
+                        + `<button type="button" data-poi-action="checkout" data-lat="${stop.lat}" data-lon="${stop.lon}" data-name="${escapeHtml(stop.name)}" class="focus-ring" style="background:var(--deep-teal);color:white;padding:0.45rem 0.85rem;border-radius:0.5rem;font-size:0.75rem;font-weight:700;border:none;cursor:pointer;">Check Out</button>`;
+                }
+            } else {
+                // Hindi pa naka-check-in: Check In (may distansya para sa konteksto).
+                const distText = Number.isFinite(distM)
+                    ? (distM < 1000 ? `${Math.round(distM)} m away` : `${(distM / 1000).toFixed(1)} km away`)
+                    : '';
+                if (detailsEl) {
+                    detailsEl.innerHTML = `Dumating ka sa <strong>${escapeHtml(stop.name)}</strong>`
+                        + (distText ? ` · <span style="font-family:'JetBrains Mono',monospace;">${distText}</span>` : '');
+                }
+                if (actionsEl) {
+                    actionsEl.innerHTML =
+                        `<button type="button" data-poi-action="checkin" data-lat="${stop.lat}" data-lon="${stop.lon}" data-name="${escapeHtml(stop.name)}" class="focus-ring" style="background:var(--ember);color:white;padding:0.45rem 0.85rem;border-radius:0.5rem;font-size:0.75rem;font-weight:700;border:none;cursor:pointer;">Check In</button>`;
+                }
+            }
+
+            card.classList.remove('hidden');
+            arrivalCardShownFor = stop.name;
+            startStayTimer(); // siguraduhing tumatakbo ang segundo-segundong update.
+        }
+
+        function hideArrivalCard() {
+            const card = document.getElementById('arrival-card');
+            if (card) card.classList.add('hidden');
+            arrivalCardShownFor = null;
+        }
+
+        // I-re-render ang arrival card para sa kasalukuyang stop (hal. pagkatapos
+        // mag-check in, lumipat mula Check In → live timer + Check Out).
+        function refreshArrivalCard() {
+            const stop = tripStops[activeStopIndex];
+            if (!stop || arrivalCardShownFor !== stop.name) return;
+            showArrivalCard(stop);
+        }
+
+        // Pagkatapos mag-check out sa aktibong stop: lumipat sa susunod at
+        // awtomatikong i-route papunta roon. Sa huling stop, ibabalik sa hotel
+        // (basecamp) at ire-reset ang pointer para gumana ulit ang arrival.
+        function advanceToNextStop(justCheckedOutName) {
+            hideArrivalCard();
+
+            const current = tripStops[activeStopIndex];
+            // Huwag galawin ang pointer kapag ang na-check out ay hindi ang
+            // aktibong stop (hal. naka-check out sa ibang lugar mula sa popup).
+            if (current && justCheckedOutName
+                && normalizePlaceText(current.name) !== normalizePlaceText(justCheckedOutName)) {
+                return;
+            }
+
+            if (activeStopIndex + 1 < tripStops.length) {
+                activeStopIndex += 1;
+                const next = tripStops[activeStopIndex];
+                if (userLocation) routeFromUserToStop(userLocation.lat, userLocation.lon, next);
+                showToast(`Tapos na sa <strong>${escapeHtml(justCheckedOutName)}</strong>. Auto-route papunta sa <strong>${escapeHtml(next.name)}</strong>.`, 'success', 5000);
+            } else {
+                // Tapos na ang buong itinerary — ibalik sa basecamp.
+                activeStopIndex = 0;
+                const home = tripStops[0];
+                if (userLocation && home) routeFromUserToStop(userLocation.lat, userLocation.lon, home);
+                showToast(`Tapos na ang buong itinerary! Auto-route pabalik sa <strong>${escapeHtml(hotelName)}</strong>.`, 'success', 6000);
+            }
+        }
+
+        // Katulad ng routeFromUserToHotel pero papunta sa isang partikular na
+        // stop (hindi lang sa hotel). Ginagamit ng guided flow.
+        function routeFromUserToStop(fromLat, fromLon, stop, options = {}) {
+            if (!map) return;
+            const shouldFit = !options || options.fit !== false;
+
+            if (currentRouteControl) {
+                map.removeControl(currentRouteControl);
+            }
+
+            const card = document.getElementById('route-guidance-card');
+            const detailsEl = document.getElementById('route-guidance-details');
+            let routeResolved = false;
+
+            const showFallbackEstimate = (reason) => {
+                if (routeResolved) return;
+                routeResolved = true;
+                const km = haversineKm(fromLat, fromLon, stop.lat, stop.lon);
+                const timeText = formatDriveTime((km / FALLBACK_SPEED_KMH) * 3600);
+                if (card && detailsEl) {
+                    card.classList.remove('hidden');
+                    detailsEl.innerHTML = `<strong>${km.toFixed(1)} km</strong> straight-line (${reason}) · Estimated driving time <strong>~${timeText}</strong> to <em>${escapeHtml(stop.name)}</em>`;
+                }
+            };
+
+            const fallbackTimer = setTimeout(() => showFallbackEstimate('road route unavailable'), 15000);
+
+            currentRouteControl = L.Routing.control({
+                waypoints: [
+                    L.latLng(fromLat, fromLon),
+                    L.latLng(stop.lat, stop.lon)
+                ],
+                routeWhileDragging: false,
+                addWaypoints: false,
+                show: false,
+                createMarker: function() { return null; },
+                lineOptions: {
+                    styles: [
+                        { color: '#0B3D3A', opacity: 0.9, weight: 6 },
+                        { color: '#D9622B', opacity: 0.5, weight: 10 }
+                    ],
+                    addWaypoints: false
+                }
+            }).addTo(map);
+
+            currentRouteControl.on('routesfound', function(e) {
+                const routes = e.routes;
+                if (routes && routes.length > 0) {
+                    routeResolved = true;
+                    clearTimeout(fallbackTimer);
+                    const primary = routes[0];
+                    const km = (primary.summary.totalDistance / 1000).toFixed(1);
+                    const timeText = formatDriveTime(primary.summary.totalTime);
+                    if (card && detailsEl) {
+                        card.classList.remove('hidden');
+                        detailsEl.innerHTML = `<strong>${km} km</strong> away · Estimated driving time <strong>~${timeText}</strong> to <em>${escapeHtml(stop.name)}</em>`;
+                    }
+                }
+            });
+
+            currentRouteControl.on('routingerror', function(err) {
+                console.warn('Routing failed:', err && err.error);
+                clearTimeout(fallbackTimer);
+                showFallbackEstimate('road route unavailable');
+            });
+
+            if (shouldFit) {
+                const bounds = L.latLngBounds([
+                    [fromLat, fromLon],
+                    [stop.lat, stop.lon]
+                ]);
+                map.fitBounds(bounds, { padding: [60, 60] });
+            }
+        }
+
         function onUserPosition(position) {
             if (!map || !markerLayers) return;
 
@@ -2359,8 +2981,20 @@
             if (needsReroute(uLat, uLon, lastRoutedPoint, lastRoutedAt, now)) {
                 lastRoutedPoint = { lat: uLat, lon: uLon };
                 lastRoutedAt = now;
-                routeFromUserToHotel(uLat, uLon, { fit: false });
+                // Guided flow: kung may naitayong stops, ang aktibong stop ang
+                // target ng ruta (hotel kung stop #1 pa tayo). Kung wala pang
+                // stops, manatili sa dating pag-route papunta sa hotel.
+                const stop = tripStops[activeStopIndex];
+                if (stop) {
+                    routeFromUserToStop(uLat, uLon, stop, { fit: false });
+                } else {
+                    routeFromUserToHotel(uLat, uLon, { fit: false });
+                }
             }
+
+            // Arrival detection: kapag lumapit sa aktibong stop, lumabas ang
+            // Check In / Check Out card (na may live timer).
+            checkArrival(uLat, uLon);
 
             followUserOnMap(uLat, uLon);
         }
@@ -2526,6 +3160,8 @@
                 drawRouteTo(lat, lon);
             } else if (trigger.dataset.poiAction === 'checkin') {
                 checkIn(lat, lon, trigger.dataset.name || '');
+            } else if (trigger.dataset.poiAction === 'checkout') {
+                checkOut(lat, lon, trigger.dataset.name || '');
             }
         }
 
@@ -2566,9 +3202,9 @@
                                     <span style="font-size: 0.75rem; color: var(--sage); margin-left: auto; font-family: 'JetBrains Mono', monospace;">${distText}</span>
                                 </div>
                                 <div id="${weatherElId}"></div>
-                                <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+                                <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center;">
                                     <button type="button" data-poi-action="route" data-lat="${placeLat}" data-lon="${placeLon}" style="flex: 1; min-width: 100px; background: var(--deep-teal); color: white; padding: 0.5rem 0.75rem; border-radius: 0.5rem; font-size: 0.75rem; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s; font-family: 'Plus Jakarta Sans', sans-serif;" onmouseover="this.style.background='var(--ember)'" onmouseout="this.style.background='var(--deep-teal)'">Show Route</button>
-                                    ${isAuthenticated ? `<button type="button" data-poi-action="checkin" data-lat="${placeLat}" data-lon="${placeLon}" data-name="${escapeHtml(place.name)}" style="flex: 1; min-width: 100px; background: var(--ember); color: white; padding: 0.5rem 0.75rem; border-radius: 0.5rem; font-size: 0.75rem; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s; font-family: 'Plus Jakarta Sans', sans-serif;" onmouseover="this.style.background='var(--ember-deep)'" onmouseout="this.style.background='var(--ember)'">Check In</button>` : ''}
+                                    ${isAuthenticated ? `<span data-visit-row data-lat="${placeLat}" data-lon="${placeLon}" data-name="${escapeHtml(place.name)}" style="display: inline-flex; align-items: center; gap: 0.4rem; flex: 1; min-width: 100px;"></span>` : ''}
                                 </div>
                             </div>
                         `;
@@ -2683,6 +3319,7 @@
                     .addTo(markerLayers).bindPopup(place.popupHTML);
                 marker.on('popupopen', () => {
                     loadWeatherIntoPopup(place.lat, place.lon, place.weatherElId);
+                    refreshVisitRowIn(marker);
                 });
             });
 
@@ -2781,10 +3418,7 @@
             const modal = document.getElementById('hotel-modal');
             const modalContent = document.getElementById('hotel-modal-content');
             document.getElementById('modal-hotel-title').innerText = hotel.name;
-            const lat = hotel.lat || selectedLat;
-            const lon = hotel.lon || selectedLon;
             document.getElementById('modal-address-text').innerText = hotel.address || 'Dagupan City, Pangasinan — view on map';
-            document.getElementById('modal-address-link').href = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
             document.getElementById('modal-price').innerText = `₱${formatPrice(hotel.price)} / night`;
             currentGallery = hotel.gallery ? hotel.gallery.split(',').map(s => s.trim()) : [hotel.image_url];
             currentImageIndex = 0;
@@ -2845,6 +3479,98 @@
             if (e.target === this) closeModal();
         });
 
+        // Step 03 photo viewer: buong image (object-contain, hindi crop) na may
+        // caption. Hiwalay sa hotel-modal para walang ID/listener conflict.
+        let placePhotoReturnFocus = null;
+        // Leaflet instance ng magnify modal. Sinisira tuwing isasara o bago
+        // buksan ang bagong lugar para walang nai-iwan na marker/tile layer.
+        let placePhotoMap = null;
+
+        function destroyPlacePhotoMap() {
+            if (placePhotoMap) { placePhotoMap.remove(); placePhotoMap = null; }
+        }
+
+        function openPlacePhoto(name, trigger) {
+            const place = findPlace(name);
+            if (!place || !place.image_url) return;
+            placePhotoReturnFocus = trigger || null;
+            const modal = document.getElementById('place-photo-modal');
+            const modalContent = document.getElementById('place-photo-modal-content');
+            if (!modal || !modalContent) return;
+            const img = document.getElementById('place-photo-img');
+            img.src = place.image_url;
+            img.alt = place.name;
+            document.getElementById('place-photo-title').innerText = place.name;
+            const meta = PLACE_CATEGORIES.find(c => c.key === place.category);
+            const rating = Number(place.rating);
+            document.getElementById('place-photo-meta').innerText =
+                `${meta ? meta.label : place.category} · ★ ${Number.isFinite(rating) ? rating.toFixed(1) : '—'} · ₱${formatPrice(place.budget_per_day)}/day`;
+            document.getElementById('place-photo-desc').innerText = place.description || '';
+
+            // Lokasyon sa mapa (tulad ng landing gallery): marker ng lugar gamit
+            // ang parehong lat/lon ng Step 04. Kapag walang koordinado, naka-hide
+            // ang mapa at foto + detalye lang ang nakikita.
+            const mapWrap = document.getElementById('place-photo-map-wrap');
+            destroyPlacePhotoMap();
+            const lat = Number(place.lat);
+            const lon = Number(place.lon);
+            const hasCoords = Number.isFinite(lat) && Number.isFinite(lon) && typeof L !== 'undefined';
+            if (mapWrap) mapWrap.classList.toggle('hidden', !hasCoords);
+            if (hasCoords && mapWrap) {
+                placePhotoMap = L.map('place-photo-map').setView([lat, lon], 16);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                    maxZoom: 18
+                }).addTo(placePhotoMap);
+                // Pangalan lang sa popup (textContent, hindi HTML) — hindi ito
+                // puwedeng maging injection kahit anong pangalan ang nasa DB.
+                const popupTitle = document.createElement('b');
+                popupTitle.textContent = place.name;
+                L.marker([lat, lon]).addTo(placePhotoMap).bindPopup(popupTitle).openPopup();
+            }
+
+            document.body.style.overflow = 'hidden';
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modalContent.classList.remove('scale-95');
+                modal.querySelector('button[aria-label="Close photo viewer"]')?.focus();
+                // Ang container ay naka-hidden hanggang buksan ang modal, kaya
+                // kailangan ng invalidateSize() para gumana ang tile layer.
+                if (placePhotoMap) placePhotoMap.invalidateSize();
+            }, 10);
+        }
+
+        function closePlacePhoto() {
+            const modal = document.getElementById('place-photo-modal');
+            const modalContent = document.getElementById('place-photo-modal-content');
+            if (!modal || !modalContent) return;
+            destroyPlacePhotoMap();
+            modal.classList.add('opacity-0');
+            modalContent.classList.add('scale-95');
+            document.body.style.overflow = '';
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                placePhotoReturnFocus?.focus();
+                placePhotoReturnFocus = null;
+            }, 300);
+        }
+
+        document.getElementById('place-photo-modal').addEventListener('click', function(e) {
+            if (e.target === this) closePlacePhoto();
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key !== 'Escape') return;
+            const photoModal = document.getElementById('place-photo-modal');
+            if (photoModal && !photoModal.classList.contains('hidden')) {
+                closePlacePhoto();
+                return;
+            }
+            const hotelModal = document.getElementById('hotel-modal');
+            if (hotelModal && !hotelModal.classList.contains('hidden')) closeModal();
+        });
+
         async function checkIn(lat, lon, name) {
             try {
                 const res = await fetch('/api/visit-log/checkin', {
@@ -2857,6 +3583,12 @@
                 });
                 const data = await res.json();
                 if (res.ok) {
+                    activeVisits[name] = new Date().toISOString();
+                    refreshVisitRows();
+                    // Kapag ang na-check in ay ang aktibong stop ng guided trip,
+                    // i-re-render ang arrival card para lumabas ang live timer +
+                    // Check Out (imbes na Check In).
+                    refreshArrivalCard();
                     showToast(`Checked in at ${name}`, 'success', 3000);
                 } else {
                     showToast(data.error || 'Check-in failed', 'error');
@@ -2879,7 +3611,12 @@
                 const data = await res.json();
                 if (res.ok) {
                     const mins = data.duration_minutes;
+                    delete activeVisits[name];
+                    refreshVisitRows();
                     showToast(`Checked out of ${name}. Stayed ${mins} min.`, 'success', 4000);
+                    // Guided flow: pagkatapos mag-check out sa aktibong stop,
+                    // awtomatikong lumipat sa susunod at i-route papunta roon.
+                    advanceToNextStop(name);
                 } else {
                     showToast(data.error || 'Check-out failed', 'error');
                 }
@@ -2899,6 +3636,91 @@
             } catch (err) {
                 return null;
             }
+        }
+
+        // —— Stay duration tracker ——
+        // Ang bukas na pag-check-in ay mula sa /api/visit-log/active. Ginagamit ng
+        // POI popup para magpakita ng "Check Out" (kasama ang live na tagal ng
+        // pananatili) imbes na "Check In" kapag naka-check-in na ang user.
+
+        async function loadActiveVisits() {
+            if (!isAuthenticated) return;
+            try {
+                const res = await fetch('/api/visit-log/active', { headers: { 'Accept': 'application/json' } });
+                if (!res.ok) return;
+                const data = await res.json();
+                activeVisits = {};
+                (data.visits || []).forEach(v => {
+                    if (v.location_name && v.checked_in_at) activeVisits[v.location_name] = v.checked_in_at;
+                });
+                refreshVisitRows();
+            } catch (err) {
+                // Non-fatal: gumagana pa rin ang check-in, kulang lang ang tracker.
+            }
+        }
+
+        function formatStayDuration(iso) {
+            const start = new Date(iso).getTime();
+            if (!isFinite(start)) return '';
+            const totalSec = Math.max(0, Math.floor((Date.now() - start) / 1000));
+            const h = Math.floor(totalSec / 3600);
+            const m = Math.floor((totalSec % 3600) / 60);
+            const s = totalSec % 60;
+            const pad = n => String(n).padStart(2, '0');
+            if (h > 0) return `${h}h ${pad(m)}m ${pad(s)}s`;
+            if (m > 0) return `${m}m ${pad(s)}s`;
+            return `${s}s`;
+        }
+
+        // Inner content ng isang visit row: Check In O Check Out na button (kasama
+        // ang live timer kapag naka-check-in). Ang wrapper na <span data-visit-row>
+        // ay nasa popup template; dito lang ang papalitan tuwing refresh.
+        function visitRowHtml(name, lat, lon) {
+            if (!isAuthenticated) return '';
+            const coords = `data-lat="${lat}" data-lon="${lon}" data-name="${escapeHtml(name)}"`;
+            const base = 'flex: 1; min-width: 100px; color: white; padding: 0.5rem 0.75rem; border-radius: 0.5rem; font-size: 0.75rem; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s; font-family: \'Plus Jakarta Sans\', sans-serif;';
+            const since = activeVisits[name];
+            if (since) {
+                return `<button type="button" data-poi-action="checkout" ${coords} style="${base} background: var(--deep-teal);" onmouseover="this.style.background='#09403c'" onmouseout="this.style.background='var(--deep-teal)'">Check Out</button>`
+                    + `<span class="stay-duration" data-stay-since="${since}" style="font-size: 0.68rem; color: var(--sage); font-family: 'JetBrains Mono', monospace; text-align: center;">${formatStayDuration(since)}</span>`;
+            }
+            return `<button type="button" data-poi-action="checkin" ${coords} style="${base} background: var(--ember);" onmouseover="this.style.background='var(--ember-deep)'" onmouseout="this.style.background='var(--ember)'">Check In</button>`;
+        }
+
+        // I-refresh ang lahat ng nakabukas na visit row sa DOM (hal. pagkatapos ng
+        // check-in/out) nang hindi nire-render ang buong marker.
+        function refreshVisitRows() {
+            document.querySelectorAll('[data-visit-row]').forEach(row => {
+                const name = row.dataset.name || '';
+                const lat = row.dataset.lat;
+                const lon = row.dataset.lon;
+                row.innerHTML = visitRowHtml(name, lat, lon);
+            });
+        }
+
+        // I-refresh ang visit row sa loob ng isang marker popup kapag binuksan, para
+        // laging tama ang button kahit naunang naka-build ang popup.
+        function refreshVisitRowIn(marker) {
+            const popup = marker.getPopup && marker.getPopup();
+            const el = popup && popup.getElement ? popup.getElement() : null;
+            const row = el && el.querySelector('[data-visit-row]');
+            if (!row) return;
+            const name = row.dataset.name || '';
+            const lat = row.dataset.lat;
+            const lon = row.dataset.lon;
+            row.innerHTML = visitRowHtml(name, lat, lon);
+        }
+
+        let stayTimerStarted = false;
+        function startStayTimer() {
+            if (stayTimerStarted) return;
+            stayTimerStarted = true;
+            setInterval(() => {
+                document.querySelectorAll('[data-stay-since]').forEach(el => {
+                    const since = el.getAttribute('data-stay-since');
+                    if (since) el.textContent = formatStayDuration(since);
+                });
+            }, 1000);
         }
 
         // —— Hotel Search ——

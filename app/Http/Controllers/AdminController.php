@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Hotel;
+use App\Models\Location;
 use App\Models\User;
 use App\Services\CacheService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 
 class AdminController extends Controller
 {
@@ -141,6 +143,107 @@ class AdminController extends Controller
                 'endpoint' => 'destroy',
             ]);
             return back()->with('error', 'An error occurred while deleting the hotel.');
+        }
+    }
+
+    /**
+     * Shared validation rules for a Location (point of interest). Kept in one
+     * place so store/update never drift apart.
+     *
+     * @return array<string, mixed>
+     */
+    private function placeRules(): array
+    {
+        return [
+            'name' => 'required|string|max:255',
+            'category' => ['required', 'string', Rule::in(array_keys(\App\Services\PlanoraService::PLACE_CATEGORY_LABELS))],
+            'location' => 'nullable|string|max:500',
+            'image_url' => 'nullable|string|max:2048',
+            'latitude' => 'required|numeric|between:-90,90',
+            'longitude' => 'required|numeric|between:-180,180',
+            'budgetPerDay' => 'required|numeric|min:0|max:99999999',
+            'rating' => 'nullable|numeric|min:0|max:10',
+            'icon' => 'nullable|string|max:255',
+            'description' => 'nullable|string',
+        ];
+    }
+
+    public function places()
+    {
+        $places = Location::orderBy('category')->orderBy('name')->paginate(50);
+        $categories = \App\Services\PlanoraService::PLACE_CATEGORY_LABELS;
+        return view('admin.places', compact('places', 'categories'));
+    }
+
+    public function storePlace(Request $request)
+    {
+        $validated = $request->validate($this->placeRules());
+
+        try {
+            Location::create($validated);
+            CacheService::clearPlacesCache();
+            Log::info('Place created by admin', [
+                'admin_id' => auth()->id(),
+                'place_name' => $validated['name'],
+                'endpoint' => 'storePlace',
+            ]);
+            return back()->with('success', 'Place added!');
+        } catch (\Exception $e) {
+            Log::error('Failed to create place', [
+                'message' => $e->getMessage(),
+                'admin_id' => auth()->id(),
+                'endpoint' => 'storePlace',
+            ]);
+            return back()->with('error', 'An error occurred while adding the place.');
+        }
+    }
+
+    public function updatePlace(Request $request, $id)
+    {
+        try {
+            $place = Location::findOrFail($id);
+            $validated = $request->validate($this->placeRules());
+
+            $place->update($validated);
+            CacheService::clearPlacesCache();
+            Log::info('Place updated by admin', [
+                'admin_id' => auth()->id(),
+                'place_id' => $id,
+                'place_name' => $validated['name'],
+                'endpoint' => 'updatePlace',
+            ]);
+            return back()->with('success', 'Place updated!');
+        } catch (\Exception $e) {
+            Log::error('Failed to update place', [
+                'message' => $e->getMessage(),
+                'admin_id' => auth()->id(),
+                'place_id' => $id,
+                'endpoint' => 'updatePlace',
+            ]);
+            return back()->with('error', 'An error occurred while updating the place.');
+        }
+    }
+
+    public function destroyPlace($id)
+    {
+        try {
+            $place = Location::findOrFail($id);
+            $place->delete();
+            CacheService::clearPlacesCache();
+            Log::info('Place deleted by admin', [
+                'admin_id' => auth()->id(),
+                'place_id' => $id,
+                'endpoint' => 'destroyPlace',
+            ]);
+            return back()->with('success', 'Place deleted!');
+        } catch (\Exception $e) {
+            Log::error('Failed to delete place', [
+                'message' => $e->getMessage(),
+                'admin_id' => auth()->id(),
+                'place_id' => $id,
+                'endpoint' => 'destroyPlace',
+            ]);
+            return back()->with('error', 'An error occurred while deleting the place.');
         }
     }
 }

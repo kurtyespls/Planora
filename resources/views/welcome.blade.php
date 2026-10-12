@@ -10,6 +10,13 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" href="/favicon.png">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    @if(count($galleryPlaces ?? []))
+    {{-- Leaflet ay para lamang sa map modal ng "A city full of stories"
+         (kapag may katalogo); hindi ito kinukuha ng curated fallback na
+         walang coordinates. --}}
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    @endif
     <link rel="stylesheet" href="/css/planora-design.css">
     <style>
         /* ── Mobile-First Responsive Overrides ── */
@@ -169,6 +176,33 @@
         }
         
         /* ── Gallery ── */
+        /* Category chips ng "A city full of stories". Nasa .place-filter ang
+           base style (mula sa planora-design.css — parehong chips ng place
+           picker), dito lang naka-override ang laki para sa landing page. */
+        .gallery-filters {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 26px;
+        }
+        .gallery-filters .place-filter {
+            padding: 0.55rem 0.8rem;
+        }
+        @media (max-width: 640px) {
+            .gallery-filters {
+                gap: 6px;
+                margin-bottom: 18px;
+            }
+            .gallery-filters .place-filter {
+                padding: 0.45rem 0.65rem;
+                font-size: 0.7rem;
+            }
+            .gallery-filters .place-filter-count {
+                font-size: 0.58rem;
+            }
+        }
+
         @media (max-width: 640px) {
             .dagupan-gallery { padding: 40px 12px 60px !important; }
             .dagupan-gallery h2 { font-size: 1.8rem !important; }
@@ -178,10 +212,6 @@
                 gap: 8px !important; 
             }
             .dagupan-gallery .group { border-radius: 12px !important; }
-            .dagupan-gallery .group:nth-child(2) { 
-                grid-column: span 2 !important; 
-                grid-row: span 1 !important; 
-            }
         }
         
         @media (max-width: 480px) {
@@ -457,56 +487,156 @@
                 <h2 class="text-3xl sm:text-4xl md:text-5xl font-display text-[var(--deep-teal)] mt-3 mb-3">A city full of stories</h2>
                 <p class="text-[var(--ink-soft)] max-w-xl mx-auto text-base sm:text-lg">From sunny beaches to colorful festivals — every corner of Dagupan has something to share.</p>
             </div>
+            @php
+                // Bokabularyo na kapareho ng Step 03 picker (planora.blade
+                // PLACE_CATEGORIES): parehong key at label, at ang singular ay
+                // galing sa PlanoraService::PLACE_CATEGORY_LABELS — iisang
+                // pinagmulan ang tawag ng landing page at ng picker. Walang
+                // icon/emoji: malinis na text label lang.
+                $galleryCategoryDisplay = [
+                    'restaurant' => ['label' => 'Restaurants', 'singular' => \App\Services\PlanoraService::PLACE_CATEGORY_LABELS['restaurant']],
+                    'mall' => ['label' => 'Malls', 'singular' => \App\Services\PlanoraService::PLACE_CATEGORY_LABELS['mall']],
+                    'beach' => ['label' => 'Beaches', 'singular' => \App\Services\PlanoraService::PLACE_CATEGORY_LABELS['beach']],
+                    'tourist' => ['label' => 'Tourist spots', 'singular' => \App\Services\PlanoraService::PLACE_CATEGORY_LABELS['tourist']],
+                ];
+                $galleryPlaces = $galleryPlaces ?? [];
+                $galleryCounts = array_count_values(array_column($galleryPlaces, 'category'));
+            @endphp
+            @if(count($galleryPlaces))
+            <!-- Category filter ng katalogo (kapareho ng Step 03 chips). Nasa
+                 LABAS ng .grid ito para hindi ito mataas bilang card at hindi
+                 magdulot ng hindi pagkakasunod-sunod ng layout. -->
+            <div class="gallery-filters" role="group" aria-label="Filter gallery by category">
+                <button type="button" class="place-filter is-active" data-gallery-filter="all" aria-pressed="true">
+                    <span class="place-filter-label">All</span>
+                    <span class="place-filter-count">{{ count($galleryPlaces) }}</span>
+                </button>
+                @foreach($galleryCategoryDisplay as $key => $meta)
+                <button type="button" class="place-filter" data-gallery-filter="{{ $key }}" aria-pressed="false">
+                    <span class="place-filter-label">{{ $meta['label'] }}</span>
+                    <span class="place-filter-count">{{ $galleryCounts[$key] ?? 0 }}</span>
+                </button>
+                @endforeach
+            </div>
+            @else
+            <!-- Fallback kapag wala pang naka-seed na lugar (o hindi pa
+                 na-migrate ang DB): ang curated na 12-card gallery pa rin
+                 ang lumilitaw, may sariling chips. -->
+            <!-- Category filter. Nasa LABAS ng .grid ito: ang mobile CSS ay
+                 bilangin ang .group bilang mga kapatid, kaya hindi dapat
+                 dagdagan ng ibang kahon ang mga card bilang mga anak ng grid. -->
+            <div class="gallery-filters" role="group" aria-label="Filter gallery by category">
+                <button type="button" class="place-filter is-active" data-gallery-filter="all" aria-pressed="true">
+                    <span class="place-filter-label">All</span>
+                    <span class="place-filter-count">12</span>
+                </button>
+                <button type="button" class="place-filter" data-gallery-filter="beach" aria-pressed="false">
+                    <span class="place-filter-label">Beaches</span>
+                    <span class="place-filter-count">2</span>
+                </button>
+                <button type="button" class="place-filter" data-gallery-filter="festival" aria-pressed="false">
+                    <span class="place-filter-label">Festivals</span>
+                    <span class="place-filter-count">2</span>
+                </button>
+                <button type="button" class="place-filter" data-gallery-filter="landmark" aria-pressed="false">
+                    <span class="place-filter-label">Landmarks</span>
+                    <span class="place-filter-count">3</span>
+                </button>
+                <button type="button" class="place-filter" data-gallery-filter="shopping" aria-pressed="false">
+                    <span class="place-filter-label">Shopping &amp; Food</span>
+                    <span class="place-filter-count">2</span>
+                </button>
+                <button type="button" class="place-filter" data-gallery-filter="streets" aria-pressed="false">
+                    <span class="place-filter-label">City Streets</span>
+                    <span class="place-filter-count">3</span>
+                </button>
+            </div>
+            @endif
+
+            @if(count($galleryPlaces))
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-                <div class="group relative overflow-hidden rounded-2xl aspect-[4/3] bg-[var(--line)] shadow-sm hover:shadow-xl transition-all duration-500 hover:-translate-y-1 reveal" style="border-radius:var(--radius-sm);">
+                {{-- Parehong katalogo ng Step 03 "Pick your places": pangalan,
+                     larawan (may category fallback), presyo kada araw at rating.
+                     Pareho ang laki ng lahat ng card (walang featured). --}}
+                @foreach($galleryPlaces as $i => $place)
+                <div class="group relative overflow-hidden rounded-2xl aspect-[4/3] bg-[var(--line)] shadow-sm hover:shadow-xl transition-all duration-500 hover:-translate-y-1 reveal" data-gallery-category="{{ $place['category'] }}" style="border-radius:var(--radius-sm);">
+                    <span class="gallery-cat" aria-hidden="true">{{ $galleryCategoryDisplay[$place['category']]['singular'] ?? 'Place' }}</span>
+                    @if(is_numeric($place['latitude']) && is_numeric($place['longitude']))
+                    <button type="button" class="place-zoom-btn" data-gallery-zoom="{{ $i }}"
+                            aria-label="Show {{ $place['name'] }} on the map" title="Show on map">⤢</button>
+                    @endif
+                    <img src="{{ $place['image_url'] }}" alt="{{ $place['name'] }}" class="w-full h-full object-cover object-center group-hover:scale-110 transition duration-700" loading="lazy" onerror="this.parentElement.style.background='linear-gradient(135deg, var(--sand), var(--line))';this.style.display='none'">
+                    <div class="gallery-label">
+                        <span>{{ $place['name'] }}</span>
+                        <span class="gallery-label-meta">₱{{ number_format($place['budget_per_day']) }}/day · ★ {{ number_format($place['rating'], 1) }}</span>
+                    </div>
+                </div>
+                @endforeach
+            </div>
+            @else
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+                <div class="group relative overflow-hidden rounded-2xl aspect-[4/3] bg-[var(--line)] shadow-sm hover:shadow-xl transition-all duration-500 hover:-translate-y-1 reveal" data-gallery-category="streets" style="border-radius:var(--radius-sm);">
+                    <span class="gallery-cat" aria-hidden="true">Streets</span>
                     <img src="/images/dagupan/beach-scene.jpg" alt="I ❤️ Dagupan sign" class="w-full h-full object-cover object-center group-hover:scale-110 transition duration-700" loading="lazy" onerror="this.parentElement.style.background='linear-gradient(135deg, var(--sand), var(--line))';this.style.display='none'">
                     <div class="gallery-label"><span>I ❤️ Dagupan</span></div>
                 </div>
-                <div class="group relative overflow-hidden rounded-2xl aspect-[4/3] bg-[var(--line)] shadow-sm hover:shadow-xl transition-all duration-500 hover:-translate-y-1 md:col-span-2 md:row-span-2 reveal" style="border-radius:var(--radius-sm);">
+                <div class="group relative overflow-hidden rounded-2xl aspect-[4/3] bg-[var(--line)] shadow-sm hover:shadow-xl transition-all duration-500 hover:-translate-y-1 reveal" data-gallery-category="beach" style="border-radius:var(--radius-sm);">
+                    <span class="gallery-cat" aria-hidden="true">Beach</span>
                     <img src="/images/dagupan/i-love-dagupan.jpg" alt="Dagupan beach" class="w-full h-full object-cover object-center group-hover:scale-110 transition duration-700" loading="lazy" onerror="this.parentElement.style.background='linear-gradient(135deg, var(--sand), var(--line))';this.style.display='none'">
                     <div class="gallery-label"><span>Tondaligan Beach</span></div>
                 </div>
-                <div class="group relative overflow-hidden rounded-2xl aspect-[4/3] bg-[var(--line)] shadow-sm hover:shadow-xl transition-all duration-500 hover:-translate-y-1 reveal" style="border-radius:var(--radius-sm);">
+                <div class="group relative overflow-hidden rounded-2xl aspect-[4/3] bg-[var(--line)] shadow-sm hover:shadow-xl transition-all duration-500 hover:-translate-y-1 reveal" data-gallery-category="festival" style="border-radius:var(--radius-sm);">
+                    <span class="gallery-cat" aria-hidden="true">Festival</span>
                     <img src="/images/dagupan/festival-dancers.jpg" alt="Bangus festival dancers" class="w-full h-full object-cover object-center group-hover:scale-110 transition duration-700" loading="lazy" onerror="this.parentElement.style.background='linear-gradient(135deg, var(--sand), var(--line))';this.style.display='none'">
                     <div class="gallery-label"><span>Bangus Festival</span></div>
                 </div>
-                <div class="group relative overflow-hidden rounded-2xl aspect-[4/3] bg-[var(--line)] shadow-sm hover:shadow-xl transition-all duration-500 hover:-translate-y-1 reveal" style="border-radius:var(--radius-sm);">
+                <div class="group relative overflow-hidden rounded-2xl aspect-[4/3] bg-[var(--line)] shadow-sm hover:shadow-xl transition-all duration-500 hover:-translate-y-1 reveal" data-gallery-category="streets" style="border-radius:var(--radius-sm);">
+                    <span class="gallery-cat" aria-hidden="true">Streets</span>
                     <img src="/images/dagupan/jeepneys.jpg" alt="Colorful jeepneys" class="w-full h-full object-cover object-center group-hover:scale-110 transition duration-700" loading="lazy" onerror="this.parentElement.style.background='linear-gradient(135deg, var(--sand), var(--line))';this.style.display='none'">
                     <div class="gallery-label"><span>Colorful Jeepneys</span></div>
                 </div>
-                <div class="group relative overflow-hidden rounded-2xl aspect-[4/3] bg-[var(--line)] shadow-sm hover:shadow-xl transition-all duration-500 hover:-translate-y-1 reveal" style="border-radius:var(--radius-sm);">
+                <div class="group relative overflow-hidden rounded-2xl aspect-[4/3] bg-[var(--line)] shadow-sm hover:shadow-xl transition-all duration-500 hover:-translate-y-1 reveal" data-gallery-category="landmark" style="border-radius:var(--radius-sm);">
+                    <span class="gallery-cat" aria-hidden="true">Landmark</span>
                     <img src="/images/dagupan/church-building.jpg" alt="Dagupan church" class="w-full h-full object-cover object-center group-hover:scale-110 transition duration-700" loading="lazy" onerror="this.parentElement.style.background='linear-gradient(135deg, var(--sand), var(--line))';this.style.display='none'">
                     <div class="gallery-label"><span>St. John's Cathedral</span></div>
                 </div>
-                <div class="group relative overflow-hidden rounded-2xl aspect-[4/3] bg-[var(--line)] shadow-sm hover:shadow-xl transition-all duration-500 hover:-translate-y-1 reveal" style="border-radius:var(--radius-sm);">
+                <div class="group relative overflow-hidden rounded-2xl aspect-[4/3] bg-[var(--line)] shadow-sm hover:shadow-xl transition-all duration-500 hover:-translate-y-1 reveal" data-gallery-category="shopping" style="border-radius:var(--radius-sm);">
+                    <span class="gallery-cat" aria-hidden="true">Shopping</span>
                     <img src="/images/dagupan/market-square.jpg" alt="Market Square" class="w-full h-full object-cover object-center group-hover:scale-110 transition duration-700" loading="lazy" onerror="this.parentElement.style.background='linear-gradient(135deg, var(--sand), var(--line))';this.style.display='none'">
                     <div class="gallery-label"><span>Market Square</span></div>
                 </div>
-                <div class="group relative overflow-hidden rounded-2xl aspect-[4/3] bg-[var(--line)] shadow-sm hover:shadow-xl transition-all duration-500 hover:-translate-y-1 reveal" style="border-radius:var(--radius-sm);">
+                <div class="group relative overflow-hidden rounded-2xl aspect-[4/3] bg-[var(--line)] shadow-sm hover:shadow-xl transition-all duration-500 hover:-translate-y-1 reveal" data-gallery-category="shopping" style="border-radius:var(--radius-sm);">
+                    <span class="gallery-cat" aria-hidden="true">Shopping</span>
                     <img src="/images/dagupan/sm-center.jpg" alt="SM Center Dagupan" class="w-full h-full object-cover object-center group-hover:scale-110 transition duration-700" loading="lazy" onerror="this.parentElement.style.background='linear-gradient(135deg, var(--sand), var(--line))';this.style.display='none'">
                     <div class="gallery-label"><span>SM Center Dagupan</span></div>
                 </div>
-                <div class="group relative overflow-hidden rounded-2xl aspect-[4/3] bg-[var(--line)] shadow-sm hover:shadow-xl transition-all duration-500 hover:-translate-y-1 reveal" style="border-radius:var(--radius-sm);">
+                <div class="group relative overflow-hidden rounded-2xl aspect-[4/3] bg-[var(--line)] shadow-sm hover:shadow-xl transition-all duration-500 hover:-translate-y-1 reveal" data-gallery-category="streets" style="border-radius:var(--radius-sm);">
+                    <span class="gallery-cat" aria-hidden="true">Streets</span>
                     <img src="/images/dagupan/street-scene.jpg" alt="Dagupan street" class="w-full h-full object-cover object-center group-hover:scale-110 transition duration-700" loading="lazy" onerror="this.parentElement.style.background='linear-gradient(135deg, var(--sand), var(--line))';this.style.display='none'">
                     <div class="gallery-label"><span>Downtown Streets</span></div>
                 </div>
-                <div class="group relative overflow-hidden rounded-2xl aspect-[4/3] bg-[var(--line)] shadow-sm hover:shadow-xl transition-all duration-500 hover:-translate-y-1 reveal" style="border-radius:var(--radius-sm);">
+                <div class="group relative overflow-hidden rounded-2xl aspect-[4/3] bg-[var(--line)] shadow-sm hover:shadow-xl transition-all duration-500 hover:-translate-y-1 reveal" data-gallery-category="festival" style="border-radius:var(--radius-sm);">
+                    <span class="gallery-cat" aria-hidden="true">Festival</span>
                     <img src="/images/dagupan/festival-parade.jpg" alt="Festival parade" class="w-full h-full object-cover object-center group-hover:scale-110 transition duration-700" loading="lazy" onerror="this.parentElement.style.background='linear-gradient(135deg, var(--sand), var(--line))';this.style.display='none'">
                     <div class="gallery-label"><span>Pistay Dayat</span></div>
                 </div>
-                <div class="group relative overflow-hidden rounded-2xl aspect-[4/3] bg-[var(--line)] shadow-sm hover:shadow-xl transition-all duration-500 hover:-translate-y-1 reveal" style="border-radius:var(--radius-sm);">
+                <div class="group relative overflow-hidden rounded-2xl aspect-[4/3] bg-[var(--line)] shadow-sm hover:shadow-xl transition-all duration-500 hover:-translate-y-1 reveal" data-gallery-category="landmark" style="border-radius:var(--radius-sm);">
+                    <span class="gallery-cat" aria-hidden="true">Landmark</span>
                     <img src="/images/dagupan/church-aerial.jpg" alt="Church aerial view" class="w-full h-full object-cover object-center group-hover:scale-110 transition duration-700" loading="lazy" onerror="this.parentElement.style.background='linear-gradient(135deg, var(--sand), var(--line))';this.style.display='none'">
                     <div class="gallery-label"><span>Aerial View</span></div>
                 </div>
-                <div class="group relative overflow-hidden rounded-2xl aspect-[4/3] bg-[var(--line)] shadow-sm hover:shadow-xl transition-all duration-500 hover:-translate-y-1 reveal" style="border-radius:var(--radius-sm);">
+                <div class="group relative overflow-hidden rounded-2xl aspect-[4/3] bg-[var(--line)] shadow-sm hover:shadow-xl transition-all duration-500 hover:-translate-y-1 reveal" data-gallery-category="landmark" style="border-radius:var(--radius-sm);">
+                    <span class="gallery-cat" aria-hidden="true">Landmark</span>
                     <img src="/images/dagupan/train.webp" alt="Historic train" class="w-full h-full object-cover object-center group-hover:scale-110 transition duration-700" loading="lazy" onerror="this.parentElement.style.background='linear-gradient(135deg, var(--sand), var(--line))';this.style.display='none'">
                     <div class="gallery-label"><span>Historic Train</span></div>
                 </div>
-                <div class="group relative overflow-hidden rounded-2xl aspect-[4/3] bg-[var(--line)] shadow-sm hover:shadow-xl transition-all duration-500 hover:-translate-y-1 reveal" style="border-radius:var(--radius-sm);">
+                <div class="group relative overflow-hidden rounded-2xl aspect-[4/3] bg-[var(--line)] shadow-sm hover:shadow-xl transition-all duration-500 hover:-translate-y-1 reveal" data-gallery-category="beach" style="border-radius:var(--radius-sm);">
+                    <span class="gallery-cat" aria-hidden="true">Beach</span>
                     <img src="/images/dagupan/beach-aerial.jpg" alt="Beach aerial view" class="w-full h-full object-cover object-center group-hover:scale-110 transition duration-700" loading="lazy" onerror="this.parentElement.style.background='linear-gradient(135deg, var(--sand), var(--line))';this.style.display='none'">
                     <div class="gallery-label"><span>Beach Aerial</span></div>
                 </div>
             </div>
+            @endif
         </section>
 
 
@@ -524,6 +654,32 @@
                 </div>
             </div>
         </section>
+
+    <!-- ── Gallery map modal (A city full of stories) ── -->
+    <!-- Ang ⤢ sa mga catalogue card ay nagbubukas nito: marker ng lugar sa
+         mapa gamit ang parehong coordinates ng Step 03. Ang curated fallback
+         ay walang coordinates, kaya walang bubukas nito doon — pero naka-render
+         ang shell para hindi magkaiba ang DOM sa dalawang path. -->
+    <div id="gallery-map-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="gallery-map-title">
+        <div class="modal-content" style="max-width:680px;">
+            <div class="flex items-start justify-between gap-3 p-4 pb-3" style="border-bottom:1px solid var(--line);">
+                <div class="min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span id="gallery-map-badge" class="font-mono font-semibold" style="padding:0.22rem 0.6rem;border-radius:var(--radius-full);background:rgba(14,46,43,0.72);color:#fff;font-size:0.6rem;letter-spacing:0.06em;text-transform:uppercase;"></span>
+                        <span id="gallery-map-meta" class="font-mono" style="font-size:0.7rem;color:var(--ink-soft);"></span>
+                    </div>
+                    <h3 id="gallery-map-title" class="font-display text-xl mt-1.5 mb-0" style="color:var(--ink);"></h3>
+                </div>
+                <button type="button" id="gallery-map-close" aria-label="Close map" title="Close"
+                        class="shrink-0 font-bold rounded-lg px-2.5 py-1 transition"
+                        style="color:var(--ink-soft);border:1px solid var(--line);background:var(--card);">✕</button>
+            </div>
+            <div id="gallery-map" style="height:360px;"></div>
+            <div class="flex items-center justify-between gap-3 flex-wrap p-4 pt-3" style="border-top:1px solid var(--line);">
+                <span class="font-mono" style="font-size:0.62rem;color:var(--sage);">Catalogue coordinates · Dagupan City</span>
+            </div>
+        </div>
+    </div>
 
     </main>
 
@@ -547,6 +703,100 @@
             } else {
                 revealEls.forEach(el => el.classList.add('is-visible'));
             }
+
+            // ── Gallery category filter ──
+            // Ang "A city full of stories" gallery ay hinahati ng chips sa itaas
+            // nito. Ang bawat card ay may `data-gallery-category`, at ang
+            // `style.display` (hindi ang CSS class) ang ginagamit para siguradong
+            // maniwala ang pagtatago kahit anong grid class ang nasa card.
+            const galleryFilterButtons = document.querySelectorAll('[data-gallery-filter]');
+            const galleryCards = document.querySelectorAll('.dagupan-gallery [data-gallery-category]');
+            if (galleryFilterButtons.length && galleryCards.length) {
+                galleryFilterButtons.forEach((button) => {
+                    button.addEventListener('click', () => {
+                        const key = button.dataset.galleryFilter;
+                        galleryFilterButtons.forEach((other) => {
+                            const active = other === button;
+                            other.classList.toggle('is-active', active);
+                            other.setAttribute('aria-pressed', String(active));
+                        });
+                        galleryCards.forEach((card) => {
+                            const show = key === 'all' || card.dataset.galleryCategory === key;
+                            card.style.display = show ? '' : 'none';
+                        });
+                    });
+                });
+            }
+
+            // ── Gallery map modal ──
+            // Ang ⤢ sa mga catalogue card ay nagbubukas ng Leaflet map na may
+            // marker ng lugar — parehong coordinates ng Step 03. Ang tile layer
+            // ay tumatawag lang kapag binuksan ang modal, at sinisira ang map
+            // pagkatapos (gaya ng initMap() ng Step 04) para walang nai-iwang
+            // listener o marker mula sa naunang lugar.
+            const galleryPlaces = @json($galleryPlaces ?? []);
+            const galleryCategoryMeta = @json($galleryCategoryDisplay ?? []);
+            let galleryMap = null;
+
+            function openGalleryMap(index) {
+                const place = galleryPlaces[index];
+                const modal = document.getElementById('gallery-map-modal');
+                if (!place || !modal) return;
+
+                const lat = Number(place.latitude);
+                const lon = Number(place.longitude);
+                if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+                if (typeof L === 'undefined') return;
+
+                const meta = galleryCategoryMeta[place.category] || {};
+                document.getElementById('gallery-map-title').textContent = place.name;
+                document.getElementById('gallery-map-badge').textContent =
+                    `${meta.singular || 'Place'}`;
+                document.getElementById('gallery-map-meta').textContent =
+                    `₱${Number(place.budget_per_day).toLocaleString('en-US')}/day · ★ ${Number(place.rating).toFixed(1)}`;
+
+                modal.classList.add('active');
+
+                if (galleryMap) { galleryMap.remove(); galleryMap = null; }
+                galleryMap = L.map('gallery-map').setView([lat, lon], 16);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                    maxZoom: 18
+                }).addTo(galleryMap);
+                // Pangalan lang sa popup (textContent, hindi HTML) — hindi ito
+                // puwedeng maging injection kahit anong pangalan ang nasa DB.
+                const popupTitle = document.createElement('b');
+                popupTitle.textContent = place.name;
+                L.marker([lat, lon]).addTo(galleryMap).bindPopup(popupTitle).openPopup();
+                setTimeout(() => { if (galleryMap) galleryMap.invalidateSize(); }, 200);
+            }
+
+            function closeGalleryMap() {
+                const modal = document.getElementById('gallery-map-modal');
+                if (!modal) return;
+                modal.classList.remove('active');
+                if (galleryMap) { galleryMap.remove(); galleryMap = null; }
+            }
+
+            document.querySelectorAll('[data-gallery-zoom]').forEach(button => {
+                button.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    openGalleryMap(Number(button.dataset.galleryZoom));
+                });
+            });
+
+            const galleryMapModal = document.getElementById('gallery-map-modal');
+            if (galleryMapModal) {
+                galleryMapModal.addEventListener('click', (event) => {
+                    if (event.target === galleryMapModal) closeGalleryMap();
+                });
+            }
+            document.getElementById('gallery-map-close')?.addEventListener('click', closeGalleryMap);
+            document.addEventListener('keydown', (event) => {
+                if (event.key !== 'Escape') return;
+                const modal = document.getElementById('gallery-map-modal');
+                if (modal && modal.classList.contains('active')) closeGalleryMap();
+            });
 
             // ── Counter animation ──
             const statNumbers = document.querySelectorAll('.stat-number');

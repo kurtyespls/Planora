@@ -32,6 +32,7 @@ class Location extends Model
         'rating',
         'category',
         'icon',
+        'image_url',
         'budgetPerDay',
         'description',
     ];

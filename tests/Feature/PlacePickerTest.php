@@ -71,6 +71,55 @@ class PlacePickerTest extends TestCase
         return $place->fresh();
     }
 
+    public function test_places_expose_a_photo_with_a_category_fallback(): void
+    {
+        $withPhoto = $this->makeLocation('Photo Mall', Location::CATEGORY_MALL, 200);
+        $withPhoto->update(['image_url' => '/images/places/sm-center-dagupan.jpg']);
+        $this->makeLocation('No Photo Mall', Location::CATEGORY_MALL, 200);
+
+        $response = $this->getJson('/api/places?daily_allowance=500');
+
+        $response->assertOk();
+
+        $malls = collect($response->json('within_budget.mall'))->keyBy('name');
+
+        // Per-place photo ang nauuna kapag naka-seed.
+        $this->assertSame('/images/places/sm-center-dagupan.jpg', $malls['Photo Mall']['image_url']);
+        // Category fallback kapag walang sariling litrato.
+        $this->assertSame(
+            PlanoraService::PLACE_CATEGORY_IMAGES[Location::CATEGORY_MALL],
+            $malls['No Photo Mall']['image_url']
+        );
+
+        // Ang card template ay nagre-render ng <img> mula sa image_url.
+        $page = $this->actingAs(User::factory()->create())->get('/planora');
+        $page->assertOk();
+        $page->assertSee('class="place-card-photo"', false);
+        $page->assertSee('place-card-media', false);
+    }
+
+    public function test_the_picker_exposes_a_photo_viewer_without_breaking_selection(): void
+    {
+        // Ang magnify button ay nagbubukas ng full-image viewer; ang card mismo
+        // ang nagse-select pa rin (article + role=button, hindi nested <button>).
+        $page = $this->actingAs(User::factory()->create())->get('/planora');
+        $page->assertOk();
+        $page->assertSee('id="place-photo-modal"', false);
+        $page->assertSee('id="place-photo-img"', false);
+        $page->assertSee('place-zoom-btn', false);
+        $page->assertSee('function openPlacePhoto(', false);
+        $page->assertSee('function closePlacePhoto()', false);
+        $page->assertSee('role="button"', false);
+        $page->assertSee('function togglePlace(', false);
+
+        // Ang magnify modal ay may mapa na rin (tulad ng landing gallery):
+        // Leaflet marker ng lugar gamit ang lat/lon ng picker.
+        $page->assertSee('id="place-photo-map"', false);
+        $page->assertSee('id="place-photo-map-wrap"', false);
+        $page->assertSee('placePhotoMap', false);
+        $page->assertSee("L.map('place-photo-map')", false);
+    }
+
     public function test_endpoint_only_offers_places_within_the_daily_allowance(): void
     {
         $this->makeLocation('Cheap Mall', Location::CATEGORY_MALL, 200);
@@ -629,23 +678,52 @@ class PlacePickerTest extends TestCase
         $response->assertSee('You can still generate an itinerary below.', false);
     }
 
-    public function test_refreshing_never_dumps_the_traveller_into_step_02(): void
+    public function test_refreshing_restores_the_full_draft_instead_of_step_01(): void
     {
         $user = User::factory()->create();
 
         $response = $this->actingAs($user)->get('/planora');
         $response->assertOk();
 
-        // REGRESSION: noong binabasa ang sessionStorage sa load at tinawag ang
-        // selectHotel(), napupunta ang traveller sa Step 02 kahit walang
-        // na-restore na budget, days, o rest schedule — kaya "nastuck" doon.
+        // Ang refresh ay hindi dapat nagbabalik sa Step 01: may draft save sa
+        // bawat transition/input, at guarded restore sa load.
+        $response->assertSee('planora_draft_v1', false);
+        $response->assertSee('function savePlannerDraft()', false);
+        $response->assertSee('function restorePlannerDraft()', false);
+        $response->assertSee('function applyHotelSelection(', false);
+        $response->assertSee('function goToStep(', false);
+        $response->assertSee('function planAnotherTrip()', false);
+
+        // Guarded restore: invalid hotel/days/budget ay hindi nagdadala sa
+        // sirang step — pinakamataas na valid prereqs ang fallback. Walang
+        // auto-generate: kapag walang naka-save na itinerary (na-refresh
+        // habang ongoing pa ang generation), ang Step 04 refresh ay bumabalik
+        // sa Step 03 na buo ang picks, at ang traveller ang magpipindot ng
+        // Generate.
+        $response->assertSee('Welcome back — please check your trip details to continue.', false);
+        $response->assertSee('Welcome back — your picks are restored. Hit Generate itinerary when ready.', false);
+
+        // Ngayon may sariling restore ang Step 04: kasama na sa draft ang
+        // itinerary (markdown + meta), kaya doon mismo ibinabalik ang
+        // traveller nang walang bagong AI call. Dapat naka-set muna ang
+        // state bago tumawag ng goToStep(4) — ang goToStep ay nagse-save,
+        // at kung wala pang laman ay Step 03 na naman sa susunod na refresh.
+        $response->assertSee('function restoreItineraryStep(', false);
+        $response->assertSee("typeof draft.itinerary === 'string'", false);
+        $response->assertSee('currentItineraryMarkdown = draft.itinerary', false);
+        $response->assertSee('itineraryMeta: lastItineraryMeta', false);
+        $response->assertSee('Welcome back — your itinerary was restored.', false);
+
+        // Ang draft ay hindi dapat mabura kapag bumagsak lang ang
+        // /api/hotels — doon lang binubura kapag loaded na ang listahan at
+        // wala na talaga ang hotel.
+        $response->assertSee('allHotels.length > 0', false);
+        $response->assertSee('your draft is kept', false);
+
+        // Ang lumang one-field restore ay wala na — full draft ang pumalit.
         $response->assertDontSee('consumePendingHotelRestore', false);
         $response->assertDontSee('pendingHotelRestoreIdx', false);
         $response->assertDontSee('function preserveHotelSelection', false);
-
-        // Ang natatanging bakas ng dating gawi ay dapat malinis sa bawat load.
-        $response->assertSee("sessionStorage.removeItem('planora_selected_idx');", false);
-        $response->assertDontSee("sessionStorage.getItem('planora_selected_idx')", false);
     }
 
     public function test_a_blank_budget_is_not_treated_as_a_valid_budget(): void

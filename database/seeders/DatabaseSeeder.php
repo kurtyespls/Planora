@@ -34,6 +34,7 @@ class DatabaseSeeder extends Seeder
             RestaurantSeeder::class,
             TouristSpotSeeder::class,
             MallSeeder::class,
+            PlaceImageSeeder::class,
         ]);
     }
 }

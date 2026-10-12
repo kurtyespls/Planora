@@ -104,6 +104,21 @@ class PlanoraService
     ];
 
     /**
+     * Fallback photo per category for the Step 03 picker cards, used when a
+     * place has no `image_url` of its own yet.
+     *
+     * Single source of truth: the service resolves `image_url` (per-place
+     * photo when seeded) before falling back here, and the browser only
+     * renders `place.image_url` — so cards never show a broken <img>.
+     */
+    public const PLACE_CATEGORY_IMAGES = [
+        Location::CATEGORY_RESTAURANT => '/images/places/restaurant-default.jpg',
+        Location::CATEGORY_MALL       => '/images/places/mall-default.jpg',
+        Location::CATEGORY_BEACH      => '/images/places/beach-default.jpg',
+        Location::CATEGORY_TOURIST    => '/images/places/tourist-default.jpg',
+    ];
+
+    /**
      * How many places a traveller may pin before the AI is sent off to build an
      * itinerary. Past this the prompt stops being a schedule and starts being a
      * grocery list, which is worse for the traveller than letting the AI choose.
@@ -408,11 +423,14 @@ class PlanoraService
 
         $rows = CacheService::getBudgetFriendlyPlaces($bucket, fn () => Location::query()
             ->whereIn('category', array_keys(self::PLACE_CATEGORY_LABELS))
-            ->get(['name', 'latitude', 'longitude', 'rating', 'category', 'icon', 'budgetPerDay', 'description'])
+            ->get(['name', 'latitude', 'longitude', 'rating', 'category', 'icon', 'image_url', 'budgetPerDay', 'description'])
             ->map(fn (Location $place) => [
                 'name' => $place->name,
                 'category' => $place->category,
                 'icon' => $place->icon ?: '📍',
+                // Per-place photo when seeded, otherwise the category fallback —
+                // the card always has something to render, never a broken <img>.
+                'image_url' => $place->image_url ?: (self::PLACE_CATEGORY_IMAGES[$place->category] ?? null),
                 'rating' => (float) $place->rating,
                 'budget_per_day' => (float) $place->budgetPerDay,
                 'description' => (string) $place->description,

@@ -46,6 +46,7 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/api/visit-log/checkin', [VisitLogController::class, 'checkIn'])->middleware('throttle.api:60,1');
     Route::post('/api/visit-log/checkout', [VisitLogController::class, 'checkOut'])->middleware('throttle.api:60,1');
+    Route::get('/api/visit-log/active', [VisitLogController::class, 'active'])->middleware('throttle.api:60,1');
 
     // Plans routes — mag-view, mag-rename, i-regenerate at i-delete ng mga
     // na-generate na itinerary ng user
@@ -63,4 +64,11 @@ Route::middleware(['auth', 'admin'])->group(function () {
     Route::post('/admin/hotels', [AdminController::class, 'store']);
     Route::delete('/admin/hotels/{id}', [AdminController::class, 'destroy']);
     Route::put('/admin/hotels/{id}', [AdminController::class, 'update']);
+
+    // Places (points of interest) management — powers the landing gallery and
+    // the Step 03 picker, so admins can curate the catalogue without a reseed.
+    Route::get('/admin/places', [AdminController::class, 'places'])->name('admin.places');
+    Route::post('/admin/places', [AdminController::class, 'storePlace']);
+    Route::put('/admin/places/{id}', [AdminController::class, 'updatePlace']);
+    Route::delete('/admin/places/{id}', [AdminController::class, 'destroyPlace']);
 });

@@ -168,4 +168,40 @@ class RouteGuidanceTest extends TestCase
         $response->assertSee('id="show-route-info"', false);
         $response->assertSee('describeFallbackRoute', false);
     }
+
+    public function test_guided_trip_wires_arrival_checkin_and_auto_route_to_next_stop(): void
+    {
+        $user = User::factory()->create(['role' => 'user']);
+
+        $response = $this->actingAs($user)->get('/planora');
+
+        $response->assertOk();
+
+        // Ang arrival card ay naka-markup sa Step 04 bago ang mapa, nakatago
+        // hangga't hindi nakararating sa isang stop.
+        $response->assertSee('id="arrival-card"', false);
+        $response->assertSee('id="arrival-actions"', false);
+        $response->assertSee('id="arrival-progress"', false);
+
+        // Ordered na stops: hotel muna, tapos ang mga napiling lugar. Ang
+        // activeStopIndex ang nagbabago tuwing check-out.
+        $response->assertSee('function buildTripStops()', false);
+        $response->assertSee('function advanceToNextStop(', false);
+        $response->assertSee('function checkArrival(', false);
+
+        // Geofence radius na nagti-trigger ng arrival card.
+        $response->assertSee('const ARRIVAL_RADIUS_M = 200;', false);
+
+        // Ang live tracking callback ay tumatawag ng checkArrival at nagre-route
+        // sa aktibong stop (hindi na palaging hotel).
+        $response->assertSee('checkArrival(uLat, uLon);', false);
+        $response->assertSee('routeFromUserToStop(uLat, uLon, stop, { fit: false });', false);
+
+        // Pagkatapos mag-check out, awtomatikong lumilipat sa susunod na stop.
+        $response->assertSee('advanceToNextStop(name);', false);
+
+        // Naka-persist sa draft para makapag-patuloy pagkatapos ng refresh.
+        $response->assertSee('tripStops: tripStops,', false);
+        $response->assertSee('activeStopIndex: activeStopIndex,', false);
+    }
 }

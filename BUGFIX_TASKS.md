@@ -51,6 +51,23 @@
       inline renaming in both the plan view and profile view, and single-click regeneration.
 - [x] **Hotel existence validation** — enforced that generated itineraries validate that
       the selected basecamp hotel exists in the database before calculating accommodation costs.
+- [x] **Step 04 did not survive a refresh** — `restorePlannerDraft()` always called
+      `goToStep(3)` for steps 3 *and* 4 (only a toast for step 4), because the generated
+      itinerary was never persisted — it lived only in the DOM and in
+      `currentItineraryMarkdown`. Refreshing on Step 04 therefore landed the traveller on
+      Step 03, where returning meant re-running the paid AI call. The draft
+      (`planora_draft_v1`) now also carries `itinerary` (markdown) + `itineraryMeta`
+      (`ai_provider`, `daily_allowance`, `budget_warning`, canonical `selected_places`),
+      saved again by `generateItinerary()` right after a successful render, and the new
+      `restoreItineraryStep()` rebuilds Step 04 in place: map (`initMap()`), itinerary
+      cards, budget-warning box, and the POI/pick pins (after re-loading the place
+      catalogue and nearby amenities, both failure-tolerant). The itinerary state is set
+      *before* `goToStep(4)` — `goToStep()` saves the draft, so an empty
+      `currentItineraryMarkdown` at that moment would wipe the stored copy. Refresh
+      **mid-generation** (no itinerary saved yet) still falls back to Step 03 with the
+      existing "Hit Generate itinerary" toast — no auto-generate, no AI cost.
+      Also hardened: a failed `/api/hotels` fetch no longer wipes the whole draft — the
+      draft is only cleared when the list loaded and the hotel is genuinely gone.
 
 ## GPS route guidance (Step 3 map + saved plans)
 - [x] **Automatic GPS detection on Step 3** — `initMap()` (called by `confirmPlan()`
