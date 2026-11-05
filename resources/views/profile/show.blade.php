@@ -259,6 +259,34 @@
                     <span class="badge {{ $user->role === 'admin' ? 'badge-admin' : 'badge-user' }}">
                         {{ ucfirst($user->role) }}
                     </span>
+                    <div class="mt-4 flex flex-col sm:flex-row items-center gap-4 text-sm">
+                    <!-- Points Badge -->
+                    <div class="flex items-center gap-2 bg-[var(--sand-deep)] rounded-xl p-3">
+                        <span class="text-[var(--deep-teal)]">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 12-8-8-4-12-8-8 4-12 8m0 2a10 10 0 1 0 10 10A10.011 10.011 0 0 0 12 22m-7-7h14"/><circle cx="3" cy="3" r="1"/><circle cx="21" cy="21" r="1"/></svg>
+                            Points
+                        </span>
+                        <span class="font-bold text-[var(--deep-teal)]">{{ $user->points ?? 0 }}</span>
+                    </div>
+                    
+                    <!-- Level Progress -->
+                    <div class="flex-1 bg-[var(--sand)] rounded-full h-4 overflow-hidden sm:mx-4">
+                        <div class="bg-[var(--deep-teal)] h-full transition-width duration-300" style="width: {{ floor(($user->points ?? 0) / 100) * 20 }}%"></div>
+                    </div>
+                    
+                    <!-- Level Info -->
+                    <div class="flex items-center gap-2">
+                        <span class="text-[var(--sage)] text-xs font-medium">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m2.17-5.66l2.83 2.83M18.36 18.36l2.83 2.83m-5.66-2.17l2.83 2.83M12 22l8-8m0-10l8 8M2 12h4m10 8h4m-7.07 7.07l-4.95-4.95m4.94 4.94l4.95 4.95"/></svg>
+                            Level
+                        </span>
+                        <span class="font-medium">{{ $user->level ?? 1 }}</span>
+                    </div>
+                </div>
+                <div class="mt-3 flex justify-between text-xs text-[var(--ink-soft)]">
+                    <span>Level {{ $user->level ?? 1 }} - {{ $user->points ?? 0 }} pts</span>
+                    <span>Next level at {{ floor(($user->points ?? 0) / 100 + 1) * 100 }} pts</span>
+                </div>
                 </div>
             </div>
 

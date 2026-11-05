@@ -96,6 +96,15 @@ class VisitLogController extends Controller
             ));
             $visit->save();
 
+            // Award points if the checked-out location is in the user's AI-generated plan
+            $this->awardPointsForAIVisit($userId, $name, $visit->location_name);
+
+            // Recalculate user level based on new points total
+            $user = User::find($userId);
+            if ($user) {
+                $user->recalculateLevel();
+            }
+
             Log::info('Visit check-out recorded', [
                 'user_id' => $userId,
                 'visit_id' => $visit->id,
@@ -151,6 +160,11 @@ class VisitLogController extends Controller
             ->open()
             ->latest('checked_in_at')
             ->first();
+    }
+/**\n     * Award points if the checked-out location is in the user's AI-generated plan.\n     */\n    private function awardPointsForAIVisit(int $userId, string $spotName, string $locationName): void\n    {\n        // Configuration: points awarded for checking out from AI-suggested locations\n        $pointsAward = 10; // Can be made configurable later\n\n        // Get the user's latest plan that has AI recommendations\n        $plan = Plan::where('user_id', $userId)\n            ->whereNotNull('ai_recommendation')\n            ->latest('id')\n            ->first();\n\n        if (!$plan) {\n            return; // No AI plan, no points awarded\n        }\n\n        // Check if the selected_places array exists and contains the location name\n        $selectedPlaces = $plan->selected_places ?? [];\n        $locationLower = strtolower(trim($locationName));\n\n        foreach ($selectedPlaces as $selectedPlace) {
+            if (strtolower(trim($selectedPlace)) === $locationLower) {
+                // Location is in the AI plan's selected places - award points\n                $user = User::find($userId);\n                if ($user) {\n                    $user->points = ($user->points ?? 0) + $pointsAward;\n                    $user->save();\n                }\n                break; // Only award points once per check-out\n            }
+        }
     }
 
     /**

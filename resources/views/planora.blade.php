@@ -3288,6 +3288,10 @@
         // nakatawag ang may hawak ng katotohanan, at nawawala ang legend ng
         // isang kategoryang may pin.
         let plottedMapTypes = new Set();
+        // Shared dedupe registry: lahat ng na-plot na lugar (Overpass + curated)
+        // ay iniimbak dito ng renderSuggestedPlaces(), at ginagamit ng
+        // renderPickedPlaces() para hindi mag-doble ang pin.
+        let plottedPlaceKeys = new Set();
 
         function renderSuggestedPlaces() {
             if (!markerLayers) return 0;
@@ -3296,6 +3300,7 @@
             // mga pinili sa susunod na renderPickedPlaces() at lilitaw ang
             // legend ng kategoryang walang pin.
             plottedMapTypes = new Set();
+            plottedPlaceKeys = new Set();
 
             const itineraryText = currentItineraryText();
             if (itineraryText === '') return 0;
@@ -3304,15 +3309,20 @@
             // maging POI pin.
             const hotelKey = normalizePlaceText(hotelName);
 
-            const plottedNames = new Set();
+            // Mga pinili ng traveller — ipapakita ng renderPickedPlaces() nang may
+            // "Your pick" label, kaya laktawan dito para hindi mawalan niyon at
+            // hindi doble.
+            const pickedKeys = new Set(
+                (Array.isArray(selectedPlaces) ? selectedPlaces : []).map(n => normalizePlaceText(n))
+            );
 
             nearbyPlacesIndex.forEach(place => {
                 const key = normalizePlaceText(place.name);
-                if (plottedNames.has(key)) return;
+                if (plottedPlaceKeys.has(key)) return;
                 if (hotelKey.length >= 3 && (key.includes(hotelKey) || hotelKey.includes(key))) return;
                 if (!itineraryMentionsPlace(place.name, itineraryText)) return;
 
-                plottedNames.add(key);
+                plottedPlaceKeys.add(key);
                 plottedMapTypes.add(place.type);
 
                 const marker = L.marker([place.lat, place.lon], { icon: makeIcon(place.iconLabel, place.iconClass) })
@@ -3323,13 +3333,59 @@
                 });
             });
 
+            // Ang mga curated lugar (mula sa `locations` catalogue) na isinuggest
+            // ng AI ay wala sa nearbyPlacesIndex (Overpass), kaya hindi sila
+            // napipin ng loop sa itaas. Hanapin sila sa catalogue at i-pin din —
+            // buong functionality tulad ng Overpass pin (weather, check-in,
+            // route) — para hindi mukhang "wala sa mapa" ang mga sinuggest na
+            // restaurant/mall/beach/tourist spot.
+            allWithinBudgetPlaces().forEach(place => {
+                const key = normalizePlaceText(place.name);
+                if (plottedPlaceKeys.has(key)) return;
+                if (pickedKeys.has(key)) return;
+                if (hotelKey.length >= 3 && (key.includes(hotelKey) || hotelKey.includes(key))) return;
+                if (!itineraryMentionsPlace(place.name, itineraryText)) return;
+
+                const placeLat = Number(place.lat);
+                const placeLon = Number(place.lon);
+                if (!Number.isFinite(placeLat) || !Number.isFinite(placeLon)) return;
+
+                plottedPlaceKeys.add(key);
+                plottedMapTypes.add(place.category);
+
+                const meta = PLACE_CATEGORIES.find(c => c.key === place.category) || PLACE_CATEGORIES[3];
+                const weatherElId = `weather-popup-curated-${key.replace(/[^a-z0-9]+/g, '-')}`;
+                const curatedPopup = `
+                    <div style="min-width: 180px;">
+                        <b style="font-size: 1rem; margin-bottom: 0.4rem; display: block;">${escapeHtml(place.name)}</b>
+                        <div style="display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.5rem;">
+                            <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${meta.dot}; box-shadow: 0 0 0 2px rgba(0,0,0,0.1);"></span>
+                            <span style="font-size: 0.8rem; color: var(--ink-soft);">${meta.label}</span>
+                            <span style="font-size: 0.75rem; color: var(--sage); margin-left: auto; font-family: 'JetBrains Mono', monospace;">₱${formatPrice(place.budget_per_day)}/day</span>
+                        </div>
+                        <div id="${weatherElId}"></div>
+                        <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center;">
+                            <button type="button" data-poi-action="route" data-lat="${placeLat}" data-lon="${placeLon}" style="flex: 1; min-width: 100px; background: var(--deep-teal); color: white; padding: 0.5rem 0.75rem; border-radius: 0.5rem; font-size: 0.75rem; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s; font-family: 'Plus Jakarta Sans', sans-serif;" onmouseover="this.style.background='var(--ember)'" onmouseout="this.style.background='var(--deep-teal)'">Show Route</button>
+                            ${isAuthenticated ? `<span data-visit-row data-lat="${placeLat}" data-lon="${placeLon}" data-name="${escapeHtml(place.name)}" style="display: inline-flex; align-items: center; gap: 0.4rem; flex: 1; min-width: 100px;"></span>` : ''}
+                        </div>
+                    </div>
+                `;
+
+                const marker = L.marker([placeLat, placeLon], { icon: makeIcon(meta.letter, meta.pin) })
+                    .addTo(markerLayers).bindPopup(curatedPopup);
+                marker.on('popupopen', () => {
+                    loadWeatherIntoPopup(placeLat, placeLon, weatherElId);
+                    refreshVisitRowIn(marker);
+                });
+            });
+
             updateLegendVisibility(plottedMapTypes);
 
-            if (plottedNames.size === 0 && nearbyPlacesIndex.length === 0) {
+            if (plottedPlaceKeys.size === 0 && nearbyPlacesIndex.length === 0) {
                 showToast('Your itinerary did not name any nearby spot, so only the hotel and your location are pinned.', 'info', 5000);
             }
 
-            return plottedNames.size;
+            return plottedPlaceKeys.size;
         }
 
         // Ang mga pinili ng traveller ay galing sa `locations` katalogo, hindi
@@ -3343,11 +3399,11 @@
             // pinagmulan noon (markdown + DOM dito, markdown lang doon), isang
             // lugar na nabanggit lamang sa DOM ay napipin nang dalawa.
             const itineraryText = currentItineraryText();
-            const alreadyPlotted = new Set(
-                nearbyPlacesIndex
-                    .filter(place => itineraryMentionsPlace(place.name, itineraryText))
-                    .map(place => normalizePlaceText(place.name))
-            );
+            // Ang renderSuggestedPlaces() ay nag-plot na ng lahat ng nabanggit na
+            // Overpass at curated lugar at iniimbak sa plottedPlaceKeys. Gamitin
+            // ito bilang dedupe dito — kung hindi, doble ang pin para sa isang
+            // curated lugar na nabanggit ng itinerary at pinili rin ng traveller.
+            const alreadyPlotted = plottedPlaceKeys;
             const hotelKey = normalizePlaceText(hotelName);
             let plotted = 0;
 

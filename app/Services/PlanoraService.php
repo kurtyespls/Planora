@@ -144,6 +144,23 @@ class PlanoraService
     public const NEARBY_PLACE_PROMPT_LIMIT = 10;
 
     /**
+     * How many budget-friendly curated catalogue places per category are offered
+     * to the model when the traveller picked nothing (or too little) in Step 03.
+     *
+     * The Overpass list is only suggestions — a live 30s-timeout call that can
+     * come back empty on a slow connection, and when it did the prompt had no
+     * places to offer but the hotel, so the AI stopped suggesting restaurants,
+     * malls and beaches. The curated `locations` catalogue never times out and
+     * every row carries a real price already filtered against the traveller's
+     * daily allowance, so it is the reliable base of the suggestion list.
+     *
+     * Kept per-category and small so a single popular category (a dozen
+     * restaurants) can't crowd the malls, beaches and tourist spots out — the
+     * same balance MAX_SELECTED_PLACES_PER_CATEGORY gives the picker.
+     */
+    public const CURATED_POOL_PER_CATEGORY = 2;
+
+    /**
      * Shortest a pick may be before it is allowed to fuzzy-match a catalogue
      * row. Only guards against one- or two-character prefixes; the real
      * discrimination is done by MIN_FUZZY_PICK_RATIO.
@@ -509,6 +526,49 @@ class PlanoraService
     }
 
     /**
+     * Budget-friendly curated places offered to the model when the traveller
+     * picked nothing (or too little) in Step 03.
+     *
+     * The Overpass list is only suggestions and can come back empty — a 30s
+     * timeout on a slow connection, or simply nothing mapped near the hotel.
+     * When that happened the prompt had no places at all, so CRITICAL RULE #1
+     * ("only recommend from this list") left the AI with nothing but the hotel
+     * to suggest. The curated `locations` catalogue is the reliable base: every
+     * row has a real price already filtered against the traveller's daily
+     * allowance, and it never depends on a live network call.
+     *
+     * Taken per-category and capped so a single popular category can't crowd
+     * the others out, and returned as canonical "Name (Category)" labels so the
+     * AI, the prompt rules and the map pins all speak the same vocabulary.
+     *
+     * @return array<int, string>
+     */
+    private function curatedPlacePool(float $dailyAllowance, ?Hotel $hotel): array
+    {
+        $budget = $this->getBudgetFriendlyPlaces(
+            $dailyAllowance,
+            $hotel?->lat !== null ? (float) $hotel->lat : null,
+            $hotel?->lon !== null ? (float) $hotel->lon : null
+        );
+
+        $labels = [];
+
+        foreach (self::PLACE_CATEGORY_LABELS as $category => $categoryLabel) {
+            $places = $budget['within_budget'][$category] ?? [];
+
+            foreach (array_slice($places, 0, self::CURATED_POOL_PER_CATEGORY) as $place) {
+                $name = trim((string) ($place['name'] ?? ''));
+
+                if ($name !== '') {
+                    $labels[] = $name . ' (' . $categoryLabel . ')';
+                }
+            }
+        }
+
+        return $labels;
+    }
+
+    /**
      * Resolve the traveller's free-form picks into canonical "Name (Category)"
      * labels that both the AI prompt and the map pins already understand.
      *
@@ -754,7 +814,21 @@ class PlanoraService
         // Ang mga pinili ng traveller sa Step 03. Nililista muna sila bago ang
         // Overpass listahan kasi doon pinuputol mula sa dulo.
         $selectedPlaceLabels = $this->selectedPlaceLabels($validated['selected_places'] ?? []);
-        $combinedPlaces = $this->prependPlaces($nearbyPlaces, $selectedPlaceLabels);
+
+        // Kapag walang pumili (o kulang ang pumili) sa Step 03, ang Overpass
+        // listahan ang tanging pinagmumulan ng mungkahi — at ito ay puwedeng
+        // ma-timeout o manliit sa mabagal na koneksyon. Kapag walang laman,
+        // wala nang maiipon ang prompt kundi ang hotel, kaya nawawalan ng
+        // restaurant/mall/beach/tourist spot ang AI. Ang curated `locations`
+        // catalogue ay hindi nag-timeout at may totoong presyo na na-filter na
+        // sa allowance, kaya ito ang batayan ng mungkahi. Nadedupe laban sa
+        // picks para hindi doble.
+        $curatedLabels = array_values(array_diff(
+            $this->curatedPlacePool($dailyAllowance, $hotel),
+            $selectedPlaceLabels
+        ));
+
+        $combinedPlaces = $this->prependPlaces($nearbyPlaces, $selectedPlaceLabels, $curatedLabels);
         $poiList = $this->allowedPlacesForPrompt($combinedPlaces, $selectedPlaceLabels);
 
         $prompt = $this->buildAiPrompt(
@@ -1224,18 +1298,36 @@ class PlanoraService
      * ticked. The pipe is stripped from each label because it is the delimiter —
      * a place name containing one would otherwise split into two fake entries.
      */
-    private function prependPlaces(?string $nearbyPlaces, array $selectedPlaceLabels): string
+    private function prependPlaces(?string $nearbyPlaces, array $selectedPlaceLabels, array $curatedLabels = []): string
     {
-        if ($selectedPlaceLabels === []) {
-            return (string) $nearbyPlaces;
+        // Ang pagkakasunod-sunod ang nagtatakda kung ano ang matitira kapag
+        // naging masyadong mahaba ang listahan: capNearbyPlaces() ay
+        // pumupuputol mula sa dulo, kaya picks → curated → Overpass. Ang picks
+        // ay pangako, ang curated ay naka-presyo at hindi nag-timeout, at ang
+        // Overpass ang pinakakonti ang halaga dahil live at puwedeng mawala.
+        // Ang pipe ay tinatanggal sa bawat label dahil delimiter ito — ang
+        // pangalan na may pipe ay mahahati sa dalawang pekeng entry.
+        $sections = [];
+
+        if ($selectedPlaceLabels !== []) {
+            $sections[] = implode('|', array_map(
+                fn (string $label) => str_replace('|', ' ', $label),
+                $selectedPlaceLabels
+            ));
         }
 
-        $picks = implode('|', array_map(
-            fn (string $label) => str_replace('|', ' ', $label),
-            $selectedPlaceLabels
-        ));
+        if ($curatedLabels !== []) {
+            $sections[] = implode('|', array_map(
+                fn (string $label) => str_replace('|', ' ', $label),
+                $curatedLabels
+            ));
+        }
 
-        return trim((string) $nearbyPlaces) === '' ? $picks : $picks . '|' . $nearbyPlaces;
+        if (trim((string) $nearbyPlaces) !== '') {
+            $sections[] = (string) $nearbyPlaces;
+        }
+
+        return implode('|', $sections);
     }
 
     private function resolveWholeRestDay(array $restList, int $days): ?int

@@ -7,6 +7,7 @@ use App\Models\Location;
 use App\Models\User;
 use App\Services\CacheService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 
@@ -24,14 +25,14 @@ class AdminController extends Controller
         return view('admin.users', compact('users', 'adminCount', 'userCount'));
     }
 
-    public function showUser($id) {
+    public function showUser(string $id) {
         $user = User::withCount('plans')->findOrFail($id);
         return view('admin.user-detail', compact('user'));
     }
 
-    public function destroyUser($id) {
+    public function destroyUser(string $id) {
         // Prevent admin from deleting themselves
-        if (auth()->id() == $id) {
+        if (Auth::id() == $id) {
             return back()->with('error', 'You cannot delete your own account.');
         }
 
@@ -39,7 +40,7 @@ class AdminController extends Controller
             $user = User::findOrFail($id);
             $user->delete();
             Log::info('User deleted by admin', [
-                'admin_id' => auth()->id(),
+                'admin_id' => Auth::id(),
                 'deleted_user_id' => $id,
                 'endpoint' => 'destroyUser',
             ]);
@@ -47,11 +48,11 @@ class AdminController extends Controller
         } catch (\Exception $e) {
             Log::error('Failed to delete user', [
                 'message' => $e->getMessage(),
-                'admin_id' => auth()->id(),
+                'admin_id' => Auth::id(),
                 'user_id' => $id,
                 'endpoint' => 'destroyUser',
             ]);
-            return back()->with('error', 'An error occurred while deleting the user.');
+            return back()->with('error', 'Theres an error while deleting this USER.');
         }
     }
 
@@ -73,7 +74,7 @@ class AdminController extends Controller
             Hotel::create($validated);
             CacheService::clearHotelsCache();
             Log::info('Hotel created by admin', [
-                'admin_id' => auth()->id(),
+                'admin_id' => Auth::id(),
                 'hotel_name' => $validated['name'],
                 'endpoint' => 'store',
             ]);
@@ -81,14 +82,14 @@ class AdminController extends Controller
         } catch (\Exception $e) {
             Log::error('Failed to create hotel', [
                 'message' => $e->getMessage(),
-                'admin_id' => auth()->id(),
+                'admin_id' => Auth::id(),
                 'endpoint' => 'store',
             ]);
             return back()->with('error', 'An error occurred while adding the hotel.');
         }
     }
 
-    public function update(Request $request, $id) {
+    public function update(Request $request, string $id) {
         try {
             $hotel = Hotel::findOrFail($id);
             $validated = $request->validate([
@@ -107,7 +108,7 @@ class AdminController extends Controller
             $hotel->update($validated);
             CacheService::clearHotelsCache();
             Log::info('Hotel updated by admin', [
-                'admin_id' => auth()->id(),
+                'admin_id' => Auth::id(),
                 'hotel_id' => $id,
                 'hotel_name' => $validated['name'],
                 'endpoint' => 'update',
@@ -116,7 +117,7 @@ class AdminController extends Controller
         } catch (\Exception $e) {
             Log::error('Failed to update hotel', [
                 'message' => $e->getMessage(),
-                'admin_id' => auth()->id(),
+                'admin_id' => Auth::id(),
                 'hotel_id' => $id,
                 'endpoint' => 'update',
             ]);
@@ -124,13 +125,13 @@ class AdminController extends Controller
         }
     }
 
-    public function destroy($id) {
+    public function destroy(string $id) {
         try {
             $hotel = Hotel::findOrFail($id);
             $hotel->delete();
             CacheService::clearHotelsCache();
             Log::info('Hotel deleted by admin', [
-                'admin_id' => auth()->id(),
+                'admin_id' => Auth::id(),
                 'hotel_id' => $id,
                 'endpoint' => 'destroy',
             ]);
@@ -138,7 +139,7 @@ class AdminController extends Controller
         } catch (\Exception $e) {
             Log::error('Failed to delete hotel', [
                 'message' => $e->getMessage(),
-                'admin_id' => auth()->id(),
+                'admin_id' => Auth::id(),
                 'hotel_id' => $id,
                 'endpoint' => 'destroy',
             ]);
@@ -183,7 +184,7 @@ class AdminController extends Controller
             Location::create($validated);
             CacheService::clearPlacesCache();
             Log::info('Place created by admin', [
-                'admin_id' => auth()->id(),
+                'admin_id' => Auth::id(),
                 'place_name' => $validated['name'],
                 'endpoint' => 'storePlace',
             ]);
@@ -191,14 +192,14 @@ class AdminController extends Controller
         } catch (\Exception $e) {
             Log::error('Failed to create place', [
                 'message' => $e->getMessage(),
-                'admin_id' => auth()->id(),
+                'admin_id' => Auth::id(),
                 'endpoint' => 'storePlace',
             ]);
             return back()->with('error', 'An error occurred while adding the place.');
         }
     }
 
-    public function updatePlace(Request $request, $id)
+    public function updatePlace(Request $request, string $id)
     {
         try {
             $place = Location::findOrFail($id);
@@ -207,7 +208,7 @@ class AdminController extends Controller
             $place->update($validated);
             CacheService::clearPlacesCache();
             Log::info('Place updated by admin', [
-                'admin_id' => auth()->id(),
+                'admin_id' => Auth::id(),
                 'place_id' => $id,
                 'place_name' => $validated['name'],
                 'endpoint' => 'updatePlace',
@@ -216,7 +217,7 @@ class AdminController extends Controller
         } catch (\Exception $e) {
             Log::error('Failed to update place', [
                 'message' => $e->getMessage(),
-                'admin_id' => auth()->id(),
+                'admin_id' => Auth::id(),
                 'place_id' => $id,
                 'endpoint' => 'updatePlace',
             ]);
@@ -224,14 +225,14 @@ class AdminController extends Controller
         }
     }
 
-    public function destroyPlace($id)
+    public function destroyPlace(string $id)
     {
         try {
             $place = Location::findOrFail($id);
             $place->delete();
             CacheService::clearPlacesCache();
             Log::info('Place deleted by admin', [
-                'admin_id' => auth()->id(),
+                'admin_id' => Auth::id(),
                 'place_id' => $id,
                 'endpoint' => 'destroyPlace',
             ]);
@@ -239,7 +240,7 @@ class AdminController extends Controller
         } catch (\Exception $e) {
             Log::error('Failed to delete place', [
                 'message' => $e->getMessage(),
-                'admin_id' => auth()->id(),
+                'admin_id' => Auth::id(),
                 'place_id' => $id,
                 'endpoint' => 'destroyPlace',
             ]);

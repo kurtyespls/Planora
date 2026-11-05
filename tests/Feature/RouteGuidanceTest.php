@@ -118,6 +118,13 @@ class RouteGuidanceTest extends TestCase
         $response->assertSee('function renderPickedPlaces(', false);
         $response->assertSee('renderPickedPlaces(data.selected_places', false);
 
+        // Ang mga curated lugar (mula sa `locations` catalogue) na isinuggest ng
+        // AI ay wala sa Overpass index, kaya dating walang pin. Ngayon, ang
+        // renderSuggestedPlaces() ay nag-i-scan na rin ng curated catalogue at
+        // nagpi-pin nila nang buong functionality (weather, check-in, route).
+        $response->assertSee('allWithinBudgetPlaces().forEach', false);
+        $response->assertSee('plottedPlaceKeys', false);
+
         // Ang legend ay may tag sa bawat category, at itinatago ang walang pin.
         $response->assertSee('id="map-legend"', false);
         $response->assertSee('data-legend="restaurant"', false);

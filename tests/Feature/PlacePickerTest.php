@@ -380,6 +380,16 @@ class PlacePickerTest extends TestCase
         // "optional" na label sa picker.
         $this->assertNotEmpty($response->json('recommendation'));
         $this->assertStringContainsString('Day 1', $response->json('recommendation'));
+
+        // REGRESSION: walang Overpass listahan sa test (walang network), kaya
+        // dating wala nang lugar maliban sa hotel — "enjoy the amenities" na
+        // lang ang lumalabas. Ang curated catalogue ay dapat magbigay ng
+        // totoong lugar kahit walang pumili sa Step 03.
+        $this->assertStringContainsString(
+            'SM Center Dagupan (Mall)',
+            $response->json('recommendation'),
+            'Without picks or Overpass data, the curated catalogue should still surface real places to suggest.'
+        );
     }
 
     public function test_a_one_peso_budget_is_rejected(): void
