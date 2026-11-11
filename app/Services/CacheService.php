@@ -84,11 +84,27 @@ class CacheService
     }
 
     /**
+     * Creates a cache key with consistent decimal precision to prevent
+     * cache misses from floating point precision differences.
+     *
+     * @param  float  $lat  Latitude
+     * @param  float  $lon  Longitude
+     * @param  int  $precision  Number of decimal places (default 4 = ~11m accuracy)
+     * @return string Cache key
+     */
+    public static function makeLocationCacheKey(float $lat, float $lon, int $precision = 4): string
+    {
+        $roundedLat = round($lat, $precision);
+        $roundedLon = round($lon, $precision);
+        return sprintf('planora_%.' . $precision . 'f_%.' . $precision . 'f', $roundedLat, $roundedLon);
+    }
+
+    /**
      * Fetch weather data with caching.
      */
     public static function getWeather(float $lat, float $lon, callable $fetcher): ?array
     {
-        $cacheKey = sprintf('planora_weather_%.4f_%.4f', $lat, $lon);
+        $cacheKey = self::makeLocationCacheKey($lat, $lon);
 
         return Cache::remember($cacheKey, self::TTL['weather'], function () use ($fetcher) {
             Log::debug('[CacheService] Cache miss — fetching weather from OpenWeatherMap');
@@ -101,7 +117,7 @@ class CacheService
      */
     public static function getNearbyPlaces(float $lat, float $lon, callable $fetcher): array
     {
-        $cacheKey = sprintf('planora_nearby_%.4f_%.4f', $lat, $lon);
+        $cacheKey = self::makeLocationCacheKey($lat, $lon);
 
         return Cache::remember($cacheKey, self::TTL['nearby'], function () use ($fetcher) {
             Log::debug('[CacheService] Cache miss — fetching nearby places from Overpass');
@@ -114,7 +130,7 @@ class CacheService
      */
     public static function clearLocationCache(float $lat, float $lon): void
     {
-        Cache::forget(sprintf('planora_weather_%.4f_%.4f', $lat, $lon));
-        Cache::forget(sprintf('planora_nearby_%.4f_%.4f', $lat, $lon));
+        $cacheKey = self::makeLocationCacheKey($lat, $lon);
+        Cache::forget($cacheKey);
     }
 }

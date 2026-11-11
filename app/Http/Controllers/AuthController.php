@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Models\Plan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -52,7 +53,7 @@ class AuthController extends Controller
                 'endpoint' => 'register',
             ]);
 
-            return redirect('/planora')->with('success', 'Account created! Welcome to Planora.');
+            return redirect('/dashboard')->with('success', 'Account created! Welcome to Planora.');
         } catch (\Exception $e) {
             Log::error('Registration failed', [
                 'message' => $e->getMessage(),
@@ -84,12 +85,93 @@ class AuthController extends Controller
                 return redirect()->intended('/admin/hotels');
             }
 
-            return redirect()->intended('/planora');
+            return redirect()->intended('/dashboard');
         }
 
         return back()->withErrors([
             'email' => 'The provided credentials do not match our records.',
         ])->onlyInput('email');
+    }
+
+    /**
+     * Dashboard - authenticated users only
+     * Shows profile, plan history, level/xp, and public plans from other users
+     */
+    public function dashboard()
+    {
+        try {
+            $user = auth()->user();
+
+            // Get user's own plans (limit to 10 most recent)
+            $userPlans = $user->plans()
+                ->orderBy('created_at', 'desc')
+                ->take(10)
+                ->get();
+
+            // Get public plans from other users
+            $otherPublicPlans = Plan::where('is_public', true)
+                ->where('user_id', '!=', $user->id)
+                ->orderBy('created_at', 'desc')
+                ->take(12)
+                ->get();
+
+            // Calculate level progress (based on User model recalculateLevel logic)
+            $points = $user->points ?? 0;
+            if ($points >= 1000) {
+                $level = 5;
+                $levelProgress = $points - 1000;
+                $nextLevelPoints = 1000;
+            } elseif ($points >= 500) {
+                $level = 4;
+                $levelProgress = $points - 500;
+                $nextLevelPoints = 500;
+            } elseif ($points >= 250) {
+                $level = 3;
+                $levelProgress = $points - 250;
+                $nextLevelPoints = 250;
+            } elseif ($points >= 100) {
+                $level = 2;
+                $levelProgress = $points - 100;
+                $nextLevelPoints = 100;
+            } else {
+                $level = 1;
+                $levelProgress = $points;
+                $nextLevelPoints = 100;
+            }
+
+            // Level details
+            $levelDetails = [
+                1 => ['name' => 'Beginner', 'color' => '#7C9187', 'bg' => '#F6EDE0', 'difficulty' => 'Easy'],
+                2 => ['name' => 'Explorer', 'color' => '#D9622B', 'bg' => '#FFF3E0', 'difficulty' => 'Moderate'],
+                3 => ['name' => 'Adventure Seeker', 'color' => '#0B3D3A', 'bg' => '#E3F2FD', 'difficulty' => 'Challenging'],
+                4 => ['name' => 'Travel Expert', 'color' => '#1B2624', 'bg' => '#F3E8FD', 'difficulty' => 'Expert'],
+                5 => ['name' => 'Master Traveler', 'color' => '#0E2E2B', 'bg' => '#EDE0CB', 'difficulty' => 'Legendary'],
+            ];
+
+            $currentLevelData = $levelDetails[$level] ?? $levelDetails[1];
+            $nextLevelData = $levelDetails[$level + 1] ?? $levelDetails[5];
+
+            return view('dashboard.index', [
+                'user' => $user,
+                'userPlans' => $userPlans,
+                'otherPublicPlans' => $otherPublicPlans,
+                'level' => $level,
+                'points' => $points,
+                'levelProgress' => $levelProgress,
+                'nextLevelPoints' => $nextLevelPoints,
+                'currentLevelData' => $currentLevelData,
+                'nextLevelData' => $nextLevelData,
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to load dashboard', [
+                'message' => $e->getMessage(),
+                'user_id' => auth()->id(),
+                'endpoint' => 'dashboard',
+            ]);
+
+            return redirect('/dashboard')->with('error', 'Unable to load dashboard. Please try again.');
+        }
     }
 
     public function logout(Request $request)
@@ -169,7 +251,7 @@ class AuthController extends Controller
                 'auth_user_id' => auth()->id(),
                 'endpoint' => 'showProfile',
             ]);
-            return redirect('/planora')->with('error', 'You are not authorized to view this profile.');
+            return redirect('/dashboard')->with('error', 'You are not authorized to view this profile.');
         }
 
         try {
@@ -186,7 +268,7 @@ class AuthController extends Controller
                 'user_id' => $id,
                 'endpoint' => 'showProfile',
             ]);
-            return redirect('/planora')->with('error', 'Unable to load profile.');
+            return redirect('/dashboard')->with('error', 'Unable to load profile.');
         }
     }
 
@@ -199,7 +281,7 @@ class AuthController extends Controller
                 'auth_user_id' => auth()->id(),
                 'endpoint' => 'updateProfile',
             ]);
-            return redirect('/planora')->with('error', 'You are not authorized to update this profile.');
+            return redirect('/dashboard')->with('error', 'You are not authorized to update this profile.');
         }
 
         try {

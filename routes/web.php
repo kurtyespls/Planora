@@ -31,6 +31,11 @@ Route::post('/logout', [AuthController::class, 'logout']);
 Route::get('/profile/{id}', [AuthController::class, 'showProfile'])->middleware('auth');
 Route::put('/profile/{id}', [AuthController::class, 'updateProfile'])->middleware('auth');
 
+// Dashboard Route
+Route::middleware('auth')->group(function () {
+    Route::get('/dashboard', [AuthController::class, 'dashboard'])->name('dashboard');
+});
+
 // API Routes with rate limiting
 Route::get('/api/hotels', [PlanoraController::class, 'getHotels'])->middleware('throttle.api:60,1');
 Route::get('/api/nearby-places', [PlanoraController::class, 'getNearbyPlaces'])->middleware('throttle.api:30,1');
@@ -42,6 +47,8 @@ Route::get('/api/places', [PlanoraController::class, 'getPlaces'])->middleware('
 // /generate-plan is behind auth because it persists a plan owned by the current
 // user and spends an external AI call.
 Route::middleware('auth')->group(function () {
+    Route::get('/my-plans', [PlanController::class, 'index'])->name('my-plans');
+
     Route::post('/generate-plan', [PlanoraController::class, 'generatePlan'])->middleware('throttle.api:20,1');
 
     Route::post('/api/visit-log/checkin', [VisitLogController::class, 'checkIn'])->middleware('throttle.api:60,1');
@@ -54,7 +61,14 @@ Route::middleware('auth')->group(function () {
     Route::patch('/plans/{plan}', [PlanController::class, 'rename']);
     Route::post('/plans/{plan}/regenerate', [PlanController::class, 'regenerate']);
     Route::delete('/plans/{plan}', [PlanController::class, 'destroy']);
+
+    // Public plan sharing — authorized users can toggle a plan's public share status
+    Route::patch('/plans/{plan}/share', [PlanController::class, 'toggleShare'])->name('plans.toggleShare');
 });
+
+// Public plan browsing — no auth needed, only is_public = true plans are shown
+Route::get('/public-plans', [PlanController::class, 'publicIndex'])->name('public-plans');
+Route::get('/public-plans/{plan}', [PlanController::class, 'publicShow'])->name('public-plans.show');
 
 Route::middleware(['auth', 'admin'])->group(function () {
     Route::get('/admin/hotels', [AdminController::class, 'index']);

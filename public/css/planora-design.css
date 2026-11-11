@@ -286,6 +286,17 @@ h3 {
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(217, 98, 43, 0.16);
 }
+.btn-outline {
+    border: 1.5px solid var(--line);
+    color: var(--ink-soft);
+    background: transparent;
+}
+.btn-outline:hover:not(:disabled) {
+    border-color: var(--deep-teal);
+    color: var(--deep-teal);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
 .btn-ghost {
     background: transparent;
     color: var(--ink);

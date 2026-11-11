@@ -669,7 +669,7 @@ class PlanoraService
      *
      * @throws \Symfony\Component\HttpKernel\Exception\HttpException when guest.
      */
-    public function generatePlan(array $validated, ?string $weatherDesc, ?string $nearbyPlaces): array
+    public function generatePlan(array $validated, ?string $weatherDesc, ?string $nearbyPlaces, bool $isPublic = false): array
     {
         // A plan must always have an owner. Persisting one with a null user_id
         // makes it unreachable from every profile page.
@@ -684,7 +684,7 @@ class PlanoraService
         // One atomic write: the plan row only comes into existence once the
         // itinerary text is ready, so a failure mid-generation can no longer
         // leave an ownerless, empty plan behind.
-        DB::transaction(function () use ($validated, $result) {
+        DB::transaction(function () use ($validated, $result, $isPublic) {
             Plan::create([
                 'user_id' => auth()->id(),
                 'hotel_name' => strip_tags($validated['hotel']),
@@ -696,6 +696,7 @@ class PlanoraService
                 'selected_places' => $result['selected_places'],
                 'ai_recommendation' => $result['recommendation'],
                 'ai_provider' => $result['ai_provider'],
+                'is_public' => $isPublic,
             ]);
         });
 

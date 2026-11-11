@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Location;
 use App\Models\VisitLog;
+use App\Models\Plan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -99,20 +100,6 @@ class VisitLogController extends Controller
             // Award points if the checked-out location is in the user's AI-generated plan
             $this->awardPointsForAIVisit($userId, $name, $visit->location_name);
 
-            // Recalculate user level based on new points total
-            $user = User::find($userId);
-            if ($user) {
-                $user->recalculateLevel();
-            }
-
-            Log::info('Visit check-out recorded', [
-                'user_id' => $userId,
-                'visit_id' => $visit->id,
-                'location_name' => $name,
-                'duration_minutes' => $visit->duration_minutes,
-                'endpoint' => 'checkOut',
-            ]);
-
             return response()->json([
                 'success' => true,
                 'message' => 'Check-out recorded',
@@ -161,9 +148,39 @@ class VisitLogController extends Controller
             ->latest('checked_in_at')
             ->first();
     }
-/**\n     * Award points if the checked-out location is in the user's AI-generated plan.\n     */\n    private function awardPointsForAIVisit(int $userId, string $spotName, string $locationName): void\n    {\n        // Configuration: points awarded for checking out from AI-suggested locations\n        $pointsAward = 10; // Can be made configurable later\n\n        // Get the user's latest plan that has AI recommendations\n        $plan = Plan::where('user_id', $userId)\n            ->whereNotNull('ai_recommendation')\n            ->latest('id')\n            ->first();\n\n        if (!$plan) {\n            return; // No AI plan, no points awarded\n        }\n\n        // Check if the selected_places array exists and contains the location name\n        $selectedPlaces = $plan->selected_places ?? [];\n        $locationLower = strtolower(trim($locationName));\n\n        foreach ($selectedPlaces as $selectedPlace) {
+
+    /**
+     * Award points if the checked-out location is in the user's AI-generated plan.
+     */
+    private function awardPointsForAIVisit(int $userId, string $spotName, string $locationName): void
+    {
+        // Configuration: points awarded for checking out from AI-suggested locations
+        $pointsAward = 10; // Can be made configurable later
+
+        // Get the user's latest plan that has AI recommendations
+        $plan = Plan::where('user_id', $userId)
+            ->whereNotNull('ai_recommendation')
+            ->latest('id')
+            ->first();
+
+        if (!$plan) {
+            return; // No AI plan, no points awarded
+        }
+
+        // Check if the selected_places array exists and contains the location name
+        $selectedPlaces = $plan->selected_places ?? [];
+        $locationLower = strtolower(trim($locationName));
+
+        foreach ($selectedPlaces as $selectedPlace) {
             if (strtolower(trim($selectedPlace)) === $locationLower) {
-                // Location is in the AI plan's selected places - award points\n                $user = User::find($userId);\n                if ($user) {\n                    $user->points = ($user->points ?? 0) + $pointsAward;\n                    $user->save();\n                }\n                break; // Only award points once per check-out\n            }
+                // Location is in the AI plan's selected places - award points
+                $user = User::find($userId);
+                if ($user) {
+                    $user->points = ($user->points ?? 0) + $pointsAward;
+                    $user->save();
+                }
+                break; // Only award points once per check-out
+            }
         }
     }
 
@@ -181,4 +198,4 @@ class VisitLogController extends Controller
             ->whereRaw('LOWER(name) = ?', [strtolower($name)])
             ->value('id');
     }
-}
+};

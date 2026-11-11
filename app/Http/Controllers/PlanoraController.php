@@ -305,13 +305,16 @@ class PlanoraController extends Controller
             // itinerary, hindi basta listahan.
             'selected_places' => 'nullable|array|max:' . PlanoraService::MAX_SELECTED_PLACES,
             'selected_places.*' => 'string|max:120',
+            // Toggle para i-share ang plan ng ibang user para sa inspiration
+            'is_public'      => 'nullable|boolean',
         ]);
 
         try {
             $result = $this->planoraService->generatePlan(
                 $validated,
                 $validated['weather_desc'] ?? null,
-                $validated['nearby_places'] ?? null
+                $validated['nearby_places'] ?? null,
+                (bool) ($validated['is_public'] ?? false)  // Default: not public
             );
 
             if (isset($result['error'])) {

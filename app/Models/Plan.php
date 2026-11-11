@@ -25,6 +25,7 @@ class Plan extends Model
         'selected_places',
         'ai_recommendation',
         'ai_provider',
+        'is_public',
     ];
 
     /**

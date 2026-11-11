@@ -12,6 +12,19 @@ use Illuminate\Support\Facades\Log;
 class PlanController extends Controller
 {
     /**
+     * List all saved plans for the current user.
+     */
+    public function index()
+    {
+        $userId = (int) Auth::id();
+        $plans = Plan::where('user_id', $userId)->orderByDesc('created_at')->get();
+
+        return view('plans.index', [
+            'plans' => $plans,
+        ]);
+    }
+
+    /**
      * Show a saved itinerary.
      *
      * The {plan} route parameter is resolved by implicit model binding, so a
@@ -28,7 +41,7 @@ class PlanController extends Controller
                 'plan_owner' => $plan->user_id,
                 'attempted_by' => $userId,
             ]);
-            return redirect('/planora')->with('error', 'Hindi mo ma-access ang plan na ito.');
+            return redirect('/dashboard')->with('error', 'Hindi mo ma-access ang plan na ito.');
         }
 
         try {
@@ -51,7 +64,7 @@ class PlanController extends Controller
                 'plan_id' => $plan->id,
                 'endpoint' => 'show',
             ]);
-            return redirect('/profile/' . $userId)->with('error', 'May error sa pag-load ng plan.');
+            return redirect('/my-plans')->with('error', 'May error sa pag-load ng plan.');
         }
     }
 
@@ -66,7 +79,7 @@ class PlanController extends Controller
                 'plan_owner' => $plan->user_id,
                 'attempted_by' => $userId,
             ]);
-            return redirect('/planora')->with('error', 'Hindi mo ma-delete ang plan na ito.');
+            return redirect('/dashboard')->with('error', 'Hindi mo ma-delete ang plan na ito.');
         }
 
         $planId = $plan->id;
@@ -79,14 +92,14 @@ class PlanController extends Controller
                 'user_id' => $userId,
             ]);
 
-            return redirect('/profile/' . $userId . '?tab=plans')->with('success', 'The plan has been deleted.');
+            return redirect('/my-plans')->with('success', 'The plan has been deleted.');
         } catch (\Exception $e) {
             Log::error('Error deleting plan', [
                 'message' => $e->getMessage(),
                 'plan_id' => $planId,
                 'user_id' => $userId,
             ]);
-            return redirect('/profile/' . $userId . '?tab=plans')->with('error', 'May error sa pag-delete ng plan.');
+            return redirect('/my-plans')->with('error', 'May error sa pag-delete ng plan.');
         }
     }
 
@@ -180,12 +193,88 @@ class PlanController extends Controller
     }
 
     /**
+     * List all public plans (anonymized, no user identity).
+     */
+    public function publicIndex()
+    {
+        $plans = Plan::where('is_public', true)
+            ->orderByDesc('created_at')
+            ->get();
+
+        return view('public-plans.index', [
+            'plans' => $plans,
+        ]);
+    }
+
+    /**
+     * Show a specific public plan (anonymized).
+     */
+    public function publicShow(Plan $plan)
+    {
+        // Only public plans are viewable here
+        if ((int) $plan->is_public !== 1) {
+            abort(404, 'Plan not found.');
+        }
+
+        $hotel = Hotel::query()
+            ->whereRaw('LOWER(name) = ?', [strtolower($plan->hotel_name)])
+            ->first();
+
+        return view('public-plans.show', [
+            'plan' => $plan,
+            'hotel' => $hotel,
+        ]);
+    }
+
+    /**
+     * Toggle public share status for the current user's plan.
+     */
+    public function toggleShare(Request $request, Plan $plan)
+    {
+        $userId = (int) Auth::id();
+
+        // OWNERSHIP CHECK
+        if ((int) $plan->user_id !== $userId) {
+            Log::warning('Unauthorized share toggle attempt', [
+                'plan_id' => $plan->id,
+                'plan_owner' => $plan->user_id,
+                'attempted_by' => $userId,
+            ]);
+            return redirect('/my-plans')->with('error', 'Hindi mo ma-toggle ang share status ng plan na ito.');
+        }
+
+        $isValid = $request->validate([
+            'is_public' => 'required|boolean',
+        ]);
+
+        try {
+            $plan->update(['is_public' => $isValid['is_public']]);
+            Log::info('Plan share toggled', [
+                'plan_id' => $plan->id,
+                'user_id' => $userId,
+                'is_public' => $isValid['is_public'],
+            ]);
+
+            return redirect('/my-plans')->with('success', $isValid['is_public']
+                ? 'Plan na binigay mo sa publiko! Madaling i-visualize ng iba ang idea mo.'
+                : 'Plan na hindi na naka-share sa publiko.');
+        } catch (\Exception $e) {
+            Log::error('Error toggling plan share', [
+                'message' => $e->getMessage(),
+                'plan_id' => $plan->id,
+                'user_id' => $userId,
+            ]);
+            return redirect('/my-plans')->with('error', 'May error sa pag-toggle ng share status.');
+        }
+    }
+
+    /**
      * Send the traveller back to whichever surface started the request.
      */
     private function planSurface(string $surface, Plan $plan, int $userId)
     {
         return $surface === 'profile'
-            ? redirect('/profile/' . $userId . '?tab=plans')
+            ? redirect('/my-plans')
             : redirect('/plans/' . $plan->id);
     }
 }

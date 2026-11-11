@@ -199,7 +199,7 @@ class PlanTest extends TestCase
 
         $this->actingAs($user)
             ->delete('/plans/' . $plan->id)
-            ->assertRedirect('/profile/' . $user->id . '?tab=plans');
+            ->assertRedirect('/my-plans');
 
         $this->assertDatabaseMissing('plans', ['id' => $plan->id]);
     }

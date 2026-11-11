@@ -537,6 +537,10 @@
                     Admin Panel
                 </a>
                 @endif
+                <a href="/my-plans" class="top-nav-link {{ request()->is('my-plans') ? 'active' : '' }}" title="My Saved Plans">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 6H9c-4 0-4 4 0 8h8c4-4 4-8 0-8z"/></svg>
+                    My Plans
+                </a>
                 <button @click="showProfilePanel = true" type="button" class="top-nav-link">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21a7 7 0 1 0-14 0"/><circle cx="12" cy="7" r="4"/></svg>
                     My Profile
