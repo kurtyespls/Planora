@@ -206,19 +206,41 @@
         .markdown-body li strong { color: var(--ink); }
         .markdown-body p { margin-bottom: 0.75rem; line-height: 1.6; color: var(--ink-soft); }
 
-        .itinerary-day { background: var(--card); border: 1px solid var(--line); border-radius: 0.9rem; margin-bottom: 0.75rem; overflow: hidden; transition: all 0.3s ease; }
-        .itinerary-day:hover { border-color: var(--ember); box-shadow: 0 4px 12px rgba(11,61,58,0.08); }
+        .itinerary-day { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-lg); margin-bottom: var(--space-3); overflow: hidden; transition: var(--transition-base); position: relative; isolate; }
+        .itinerary-day::before {
+            content: ''; position: absolute; inset: 0; border-radius: var(--radius-lg);
+            background: linear-gradient(135deg, rgba(11,61,58,0.03) 0%, transparent 50%);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity var(--transition-fast);
+        }
+        .itinerary-day:hover { border-color: var(--ember); box-shadow: var(--shadow-lg); }
+        .itinerary-day:hover::before { opacity: 1; }
+        .itinerary-day:focus-visible { outline: 2px solid var(--deep-teal); outline-offset: -4px; }
         .itinerary-day summary {
-            list-style: none; cursor: pointer; user-select: none; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.9rem 1.1rem;
+            list-style: none; cursor: pointer; user-select: none; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: var(--space-2) var(--space-3);
             background: var(--sand-deep); font-family: 'Fraunces', serif; font-weight: 600; color: var(--deep-teal);
-            transition: background 0.2s ease;
+            border-radius: calc(var(--radius-lg) - var(--space-1)); transition: background var(--transition-fast);
+            font-size: var(--text-sm);
+            backdrop-filter: blur(2px);
         }
         .itinerary-day summary:hover { background: var(--line); }
+        .itinerary-day summary:focus-visible { outline: 2px solid var(--deep-teal); outline-offset: 2px; border-radius: calc(var(--radius-lg) - var(--space-1)); }
         .itinerary-day summary::-webkit-details-marker { display: none; }
-        .itinerary-day .chevron { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--ember); transition: transform 0.25s ease; flex-shrink: 0; }
+        .itinerary-day .chevron { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--ember); transition: transform var(--transition-fast); flex-shrink: 0; }
         .itinerary-day[open] .chevron { transform: rotate(180deg); }
-        .itinerary-day .day-body { padding: 1rem 1.1rem 1.1rem; animation: fadeInUp 0.3s ease-out; }
+        .itinerary-day .day-body { padding: var(--space-3) var(--space-4); animation: fadeInUp 0.3s ease-out; }
         .itinerary-day + .itinerary-day { margin-top: 0; }
+        .itinerary-day .markdown-body { color: var(--ink-soft); line-height: 1.6; }
+        .itinerary-day .markdown-body h1, .itinerary-day .markdown-body h2, .itinerary-day .markdown-body h3 { color: var(--ink); font-weight: 600; margin-top: var(--space-3); margin-bottom: var(--space-1); }
+        .itinerary-day .markdown-body h1 { font-size: var(--text-xl); }
+        .itinerary-day .markdown-body h2 { font-size: var(--text-lg); }
+        .itinerary-day .markdown-body h3 { font-size: var(--text-base); }
+        .itinerary-day .markdown-body p { margin-bottom: var(--space-2); }
+        .itinerary-day .markdown-body ul { list-style: none; padding-left: 0; margin-bottom: var(--space-1); }
+        .itinerary-day .markdown-body li { margin-bottom: var(--text-sm); padding-left: var(--space-2); position: relative; line-height: 1.55; color: var(--ink-soft); }
+        .itinerary-day .markdown-body li::before { content: '→'; position: absolute; left: 0; color: var(--ember); font-weight: 700; }
+        .itinerary-day .markdown-body li strong { color: var(--ink); }
 
         .itinerary-badge {
             display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.2rem 0.65rem;
@@ -407,14 +429,154 @@
         .map-legend span:hover { transform: translateY(-1px); }
         .legend-dot { width: 10px; height: 10px; border-radius: 999px; display: inline-block; box-shadow: 0 0 0 2px rgba(0,0,0,0.1); }
 
-        /* —— AI itinerary overflow safety (all widths) —— */
+        /* —— AI itinerary overflow safety + markdown typography (all widths) —— */
         /* AI markdown puwedeng maglaman ng mahabang URL, table o code block na
-           sumisira sa mobile kung walang wrap at scroll. */
-        #ai-output, #ai-output .day-body, .markdown-body { overflow-wrap: break-word; }
-        #ai-output table, .markdown-body table { display: block; max-width: 100%; overflow-x: auto; }
-        #ai-output img, #ai-output pre, .ai-output pre, .markdown-body img, .markdown-body pre { max-width: 100%; overflow-x: auto; }
+           sumisira sa mobile kung walang wrap at scroll. All text within #ai-output
+           is scoped so global markdown-body styles don't leak. */
+        #ai-output {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        #ai-output .markdown-body,
+        #ai-output .day-body {
+            overflow-wrap: break-word;
+            text-align: justify;
+            line-height: 1.7;
+            color: var(--ink-soft);
+            font-size: 0.875rem;
+        }
+        #ai-output .markdown-body h2,
+        #ai-output .markdown-body h3,
+        #ai-output .markdown-body h4,
+        #ai-output .day-body .markdown-body h2,
+        #ai-output .day-body .markdown-body h3,
+        #ai-output .day-body .markdown-body h4 {
+            font-family: 'Fraunces', serif;
+            color: var(--deep-teal);
+            line-height: 1.3;
+            margin: 1.5rem 0 1rem;
+        }
+        #ai-output .markdown-body h2,
+        #ai-output .day-body .markdown-body h2 { font-size: 1.5rem; }
+        #ai-output .markdown-body h3,
+        #ai-output .day-body .markdown-body h3 { font-size: 1.25rem; }
+        #ai-output .markdown-body h4,
+/* Trip Summary section - color red */
+#ai-output .markdown-body h2.trip-summary,
+#ai-output .day-body .markdown-body h2.trip-summary {
+    color: #ff0000 !important;
+    font-size: 1.25rem;
+}
+        #ai-output .day-body .markdown-body h4 { font-size: 1.1rem; }
+        #ai-output .markdown-body blockquote,
+        #ai-output .day-body .markdown-body blockquote {
+            border-left: 3px solid var(--ember);
+            background: rgba(217, 98, 43, 0.08);
+            padding: 0.75rem 1rem;
+            margin: 1rem 0;
+            font-style: italic;
+            color: var(--ember);
+        }
+        #ai-output .markdown-body code,
+        #ai-output .day-body .markdown-body code {
+            background: var(--sand-deep);
+            color: var(--deep-teal);
+            padding: 0.15rem 0.35rem;
+            border-radius: var(--radius-sm);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+        }
+        #ai-output .markdown-body pre,
+        #ai-output .day-body .markdown-body pre {
+            background: var(--sand-deep);
+            color: var(--ink);
+            padding: 1rem;
+            overflow-x: auto;
+            border-radius: var(--radius-md);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            line-height: 1.45;
+        }
+        #ai-output .markdown-body hr,
+        #ai-output .day-body .markdown-body hr {
+            border: 0;
+            border-top: 1px solid var(--line);
+            margin: 2rem 0;
+        }
+        #ai-output .markdown-body a,
+        #ai-output .day-body .markdown-body a {
+            color: var(--deep-teal);
+            text-decoration: underline;
+            text-underline-offset: 3px;
+            text-decoration-color: var(--ember);
+        }
+        #ai-output .markdown-body strong,
+        #ai-output .day-body .markdown-body strong {
+    color: var(--ink);
+}
 
-        /* —— Responsive utilities —— */
+/* Day accordion card */
+#ai-output .itinerary-day {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 0.9rem;
+    margin-bottom: 0.75rem;
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.3s ease;
+}
+#ai-output .itinerary-day:hover {
+    border-color: var(--ember);
+    box-shadow: 0 4px 12px rgba(11, 61, 58, 0.08);
+    transform: translateY(-1px);
+}
+#ai-output .itinerary-day summary {
+    list-style: none;
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.9rem 1.1rem;
+    background: var(--sand-deep);
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    color: var(--deep-teal);
+    transition: background 0.2s ease;
+}
+#ai-output .itinerary-day summary:hover { background: var(--line); }
+#ai-output .itinerary-day summary::-webkit-details-marker { display: none; }
+#ai-output .itinerary-day .chevron {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--ember);
+    transition: transform 0.25s ease;
+    flex-shrink: 0;
+}
+#ai-output .itinerary-day[open] .chevron { transform: rotate(180deg); }
+#ai-output .itinerary-day .day-body {
+    padding: 1rem 1.1rem 1.1rem;
+    animation: fadeInUp 0.3s ease-out forwards;
+}
+#ai-output .itinerary-day + .itinerary-day { margin-top: 0; }
+
+/* Badges inside #ai-output */
+#ai-output .itinerary-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.65rem;
+    border-radius: 9999px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+#ai-output .itinerary-badge-groq { background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; }
+#ai-output .itinerary-badge-local { background: var(--sand-deep); color: var(--ink-soft); border: 1px solid var(--line); }
         @media (max-width: 640px) {
             .hotel-card-enter { animation: none; }
             .step.active { animation: none; }
@@ -537,6 +699,10 @@
                     Admin Panel
                 </a>
                 @endif
+                <a href="/dashboard" class="top-nav-link {{ request()->is('dashboard') ? 'active' : '' }}" title="Traveler Dashboard">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                    Dashboard
+                </a>
                 <a href="/my-plans" class="top-nav-link {{ request()->is('my-plans') ? 'active' : '' }}" title="My Saved Plans">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 6H9c-4 0-4 4 0 8h8c4-4 4-8 0-8z"/></svg>
                     My Plans
@@ -573,13 +739,25 @@
                         <span>Admin Panel</span>
                     </a>
                     @endif
+                    <a href="/dashboard" class="flex items-center gap-3 p-3 rounded-xl hover:bg-[var(--sand-deep)] transition font-medium">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                        <span>Dashboard</span>
+                    </a>
+                    <a href="/my-plans" class="flex items-center gap-3 p-3 rounded-xl hover:bg-[var(--sand-deep)] transition font-medium">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 6H9c-4 0-4 4 0 8h8c4-4 4-8 0-8z"/></svg>
+                        <span>My Plans</span>
+                    </a>
+                    <a href="/public-plans" class="flex items-center gap-3 p-3 rounded-xl hover:bg-[var(--sand-deep)] transition font-medium">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+                        <span>Public Plans</span>
+                    </a>
                     <a href="/profile/{{ auth()->id() }}" class="flex items-center gap-3 p-3 rounded-xl hover:bg-[var(--sand-deep)] transition">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7a4 4 0 10-8 0 4 4 0 008 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                         <span>Profile Settings</span>
                     </a>
                     <form method="POST" action="/logout">
                         @csrf
-                        <button type="submit" class="w-full flex items-center gap-3 p-3 rounded-xl text-[var(--ember-deep)] hover:bg-[var(--sand-deep)] transition">
+                        <button type="submit" class="w-full flex items-center gap-3 p-3 rounded-xl text-[var(--ember-deep)] hover:bg-[var(--sand-deep)] transition" onclick="sessionStorage.removeItem('planora_draft_v1');">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
                             <span>Log out</span>
                         </button>
@@ -840,7 +1018,7 @@
 
                 <div id="budget-warning-box" class="budget-warning hidden"></div>
 
-                <div id="itinerary-header-card" class="hidden mb-4 p-4 rounded-xl border border-[var(--line)] bg-[var(--sand-deep)] flex flex-wrap items-center justify-between gap-3">
+                <div id="itinerary-header-card" mb-4 p-4 rounded-xl border border-[var(--line)] bg-[var(--sand-deep)] flex flex-wrap items-center justify-between gap-3">
                     <div class="flex flex-wrap items-center gap-2">
                         <span id="itinerary-provider-badge" class="itinerary-badge itinerary-badge-local">Plan</span>
                         <span id="itinerary-meta-text" class="text-xs text-[var(--ink-soft)] font-mono"></span>
@@ -863,11 +1041,6 @@
                 </button>
             </div>
         </div>
-
-        <footer class="text-center mt-6 font-mono text-[0.62rem] uppercase tracking-widest text-[var(--sage)]">
-            Planora · Itinerary Systems Desk · Dagupan City
-        </footer>
-    </div>
 
     <!-- —— Toast Container —— -->
     <div id="toast-container"></div>

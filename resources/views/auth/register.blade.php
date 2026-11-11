@@ -183,6 +183,8 @@
     <main class="auth-shell">
         <!-- ── Left: Image Side ── -->
         <aside class="auth-art" style="order:1;">
+            <div class="orb-bg orb-1"></div>
+            <div class="orb-bg orb-2"></div>
             <img src="/images/dagupan/beach-aerial.jpg" alt="Dagupan aerial view" onerror="this.parentElement.style.background='linear-gradient(145deg, var(--deep-teal-ink), var(--deep-teal))'">
             <div class="auth-art-copy">
                 <div class="auth-art-quote">
@@ -208,9 +210,9 @@
                     <p>Create your account and make travel feel effortless.</p>
                 </div>
 
-                <a href="/planora" class="brand" style="margin-bottom:8px;"><span class="brand-mark">⌁<img src="/images/planora-logo-sm.png" alt="" class="brand-logo" onerror="this.remove()"></span><span>planora</span></a>
-                <h1>Let's go places.</h1>
-                <p class="auth-subtitle">Create your account and make travel feel effortless.</p>
+                <a href="/planora" class="brand auth-entry-1" style="margin-bottom:8px;"><span class="brand-mark">⌁<img src="/images/planora-logo-sm.png" alt="" class="brand-logo" onerror="this.remove()"></span><span>planora</span></a>
+                <h1 class="auth-entry-2">Let's go places.</h1>
+                <p class="auth-subtitle auth-entry-3">Create your account and make travel feel effortless.</p>
 
                 @if ($errors->any())
                 <div class="mb-6 p-4 rounded-xl" style="background:#FEF2F2;border:1px solid #FECACA;color:#991B1B;font-size:0.85rem;">
@@ -242,7 +244,7 @@
                             <label for="password">Password</label>
                             <div style="position:relative;">
                                 <input type="password" name="password" id="password" required minlength="6" placeholder="Create password" autocomplete="new-password">
-                                <button type="button" class="toggle-pw" onclick="togglePassword('password', this)" aria-label="Toggle password visibility">👁️</button>
+                                <button type="button" class="toggle-pw" onclick="togglePassword('password', this)" aria-label="Toggle password visibility"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
                             </div>
                             <!-- Password Strength -->
                             <div class="pw-strength" id="pw-strength">
@@ -257,7 +259,7 @@
                             <label for="password_confirmation">Confirm</label>
                             <div style="position:relative;">
                                 <input type="password" name="password_confirmation" id="password_confirmation" required minlength="6" placeholder="Confirm password" autocomplete="new-password">
-                                <button type="button" class="toggle-pw" onclick="togglePassword('password_confirmation', this)" aria-label="Toggle password visibility">👁️</button>
+                                <button type="button" class="toggle-pw" onclick="togglePassword('password_confirmation', this)" aria-label="Toggle password visibility"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
                             </div>
                             <!-- Match Indicator -->
                             <div class="pw-match" id="pw-match" style="opacity:0;">

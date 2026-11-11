@@ -214,28 +214,16 @@
         @if($hotel && $hotel->lat !== null && $hotel->lon !== null)
         <div class="plan-card p-4 sm:p-5 mb-6">
             <div class="flex items-center justify-between gap-3 mb-3 flex-wrap">
-                <h2 class="font-display text-lg font-semibold text-[var(--ink)]">Basecamp</h2>
                 <div class="flex items-center gap-2">
-                    <button type="button" onclick="detectLocationAndRoute()" id="btn-detect-route-show" class="text-xs font-semibold px-3 py-1.5 rounded-lg border border-[var(--line)] hover:bg-[var(--sand-deep)] text-[var(--deep-teal)] transition flex items-center gap-1.5">
-                        <span>📍 Route from my location</span>
-                    </button>
+                    
                     <span id="tracking-status-show" class="text-xs font-semibold" style="display:none;color:var(--ember-deep);">● LIVE</span>
-                    <button type="button" onclick="toggleShowTracking()" id="btn-toggle-tracking-show" class="text-xs font-semibold px-3 py-1.5 rounded-lg border border-[var(--line)] hover:bg-[var(--sand-deep)] text-[var(--deep-teal)] transition flex items-center gap-1.5">
-                        Start live tracking
-                    </button>
+                    
                 </div>
             </div>
 
             <div id="show-route-info" class="hidden mb-3 p-3 rounded-lg border border-[var(--line)] bg-[var(--sand-deep)] text-xs text-[var(--ink)] font-mono">
                 Calculating route…
             </div>
-
-            <div id="plan-map"
-                 data-lat="{{ (float) $hotel->lat }}"
-                 data-lon="{{ (float) $hotel->lon }}"
-                 data-name="{{ $hotel->name }}"></div>
-            <p class="mt-3 text-sm text-[var(--ink-soft)]">{{ $hotel->address ?: 'Dagupan City, Pangasinan' }}</p>
-        </div>
         @endif
 
         <div class="plan-card p-6 sm:p-8">

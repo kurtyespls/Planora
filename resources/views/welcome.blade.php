@@ -356,8 +356,13 @@
         <div class="nav-container" style="max-width:1180px;margin:auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:100%;">
             <a href="/" class="brand" style="color:white;"><span class="brand-mark" style="background:rgba(255,255,255,0.15);color:white;box-shadow:none;">⌁<img src="/images/planora-logo-sm.png" alt="" class="brand-logo" onerror="this.remove()"></span><span style="font-weight:800;">planora</span></a>
             <div class="flex items-center gap-2 sm:gap-3">
-                <a href="/login" class="nav-btn px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-bold text-white/80 hover:text-white transition" style="text-decoration:none;">Sign in</a>
-                <a href="/register" class="nav-btn-plan px-5 sm:px-6 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-bold" style="background:var(--ember);color:white;text-decoration:none;box-shadow:0 8px 24px rgba(217,98,43,0.3);transition:all 0.25s ease;" onmouseover="this.style.background='var(--ember-deep)';this.style.transform='translateY(-2px)';this.style.boxShadow='0 12px 32px rgba(217,98,43,0.4)';" onmouseout="this.style.background='var(--ember)';this.style.transform='translateY(0)';this.style.boxShadow='0 8px 24px rgba(217,98,43,0.3)';">Plan a trip</a>
+                @auth
+                    <a href="/dashboard" class="nav-btn px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-bold text-white/80 hover:text-white transition" style="text-decoration:none;">Dashboard</a>
+                    <a href="/planora" class="nav-btn-plan px-5 sm:px-6 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-bold" style="background:var(--ember);color:white;text-decoration:none;box-shadow:0 8px 24px rgba(217,98,43,0.3);transition:all 0.25s ease;">Open Planner</a>
+                @else
+                    <a href="/login" class="nav-btn px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-bold text-white/80 hover:text-white transition" style="text-decoration:none;">Sign in</a>
+                    <a href="/register" class="nav-btn-plan px-5 sm:px-6 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-bold" style="background:var(--ember);color:white;text-decoration:none;box-shadow:0 8px 24px rgba(217,98,43,0.3);transition:all 0.25s ease;" onmouseover="this.style.background='var(--ember-deep)';this.style.transform='translateY(-2px)';this.style.boxShadow='0 12px 32px rgba(217,98,43,0.4)';" onmouseout="this.style.background='var(--ember)';this.style.transform='translateY(0)';this.style.boxShadow='0 8px 24px rgba(217,98,43,0.3)';">Plan a trip</a>
+                @endauth
             </div>
         </div>
     </nav>
@@ -416,21 +421,21 @@
 
         <!-- ── Features ── -->
         <section class="feature-strip" style="padding-top:40px;">
-            <article class="feature-tile reveal" style="border-top:4px solid var(--deep-teal);">
+            <article class="feature-tile reveal reveal-delay-1" style="border-top:4px solid var(--deep-teal);">
                 <div class="feature-icon">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
                 </div>
                 <h3 class="font-bold text-lg text-[var(--deep-teal)] mb-2">Stay somewhere special</h3>
                 <p class="text-sm leading-6 text-[var(--ink-soft)]">Compare local hotels and find the right base for your city escape.</p>
             </article>
-            <article class="feature-tile reveal" style="border-top:4px solid var(--ember);">
+            <article class="feature-tile reveal reveal-delay-2" style="border-top:4px solid var(--ember);">
                 <div class="feature-icon">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
                 </div>
                 <h3 class="font-bold text-lg text-[var(--deep-teal)] mb-2">Make every peso count</h3>
                 <p class="text-sm leading-6 text-[var(--ink-soft)]">See a practical breakdown designed around your real travel budget.</p>
             </article>
-            <article class="feature-tile reveal" style="border-top:4px solid var(--deep-teal);">
+            <article class="feature-tile reveal reveal-delay-3" style="border-top:4px solid var(--deep-teal);">
                 <div class="feature-icon">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
                 </div>
@@ -841,5 +846,6 @@
             });
         })();
     </script>
+    <script src="/js/planora-animations.js"></script>
 </body>
 </html>

@@ -25,7 +25,28 @@
         .page-header .back-link { display: inline-flex; align-items: center; gap: 8px; color: var(--deep-teal); text-decoration: none; font-weight: 600; margin-bottom: 16px; }
         .page-header .back-link:hover { color: var(--ember); }
         .card-grid { max-width: 1120px; margin: 0 auto; padding: 0 20px 48px; }
-        .public-plan-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: 32px; max-width: 800px; margin: 0 auto; }
+        .public-plan-card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-sm);
+            padding: var(--space-6);
+            max-width: 800px;
+            margin: 0 auto;
+            position: relative;
+            transition: var(--transition-base);
+        }
+        .public-plan-card::before {
+            content: ''; position: absolute; inset: 0; border-radius: var(--radius-lg);
+            background: linear-gradient(135deg, rgba(11,61,58,0.03) 0%, transparent 50%);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity var(--transition-fast);
+        }
+        .public-plan-card:hover { border-color: var(--ember); box-shadow: var(--shadow-lg); }
+        .public-plan-card:hover::before { opacity: 1; }
+        .public-plan-card:focus-visible { outline: 2px solid var(--deep-teal); outline-offset: -4px; }
+        .public-plan-card:focus-visible::before { opacity: 1; }
         .public-creator-tag { display: inline-flex; align-items: center; gap: 6px; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; background: rgba(34, 197, 94, 0.15); color: #16a34a; }
         .section-title { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft); margin-bottom: 8px; }
         .budget-row { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--sand); border-radius: var(--radius-md); }

@@ -108,12 +108,18 @@ class AuthController extends Controller
                 ->take(10)
                 ->get();
 
-            // Get public plans from other users
-            $otherPublicPlans = Plan::where('is_public', true)
+            // Get public plans from other users with user relation
+            $otherPublicPlans = Plan::with('user')
+                ->where('is_public', true)
                 ->where('user_id', '!=', $user->id)
                 ->orderBy('created_at', 'desc')
                 ->take(12)
                 ->get();
+
+            // Total counts for dashboard metrics
+            $userPlansCount = $user->plans()->count();
+            $userPublicPlansCount = $user->plans()->where('is_public', true)->count();
+            $totalCommunityPlansCount = Plan::where('is_public', true)->count();
 
             // Calculate level progress (based on User model recalculateLevel logic)
             $points = $user->points ?? 0;
@@ -139,28 +145,34 @@ class AuthController extends Controller
                 $nextLevelPoints = 100;
             }
 
-            // Level details
+            // Level roadmap details
             $levelDetails = [
-                1 => ['name' => 'Beginner', 'color' => '#7C9187', 'bg' => '#F6EDE0', 'difficulty' => 'Easy'],
-                2 => ['name' => 'Explorer', 'color' => '#D9622B', 'bg' => '#FFF3E0', 'difficulty' => 'Moderate'],
-                3 => ['name' => 'Adventure Seeker', 'color' => '#0B3D3A', 'bg' => '#E3F2FD', 'difficulty' => 'Challenging'],
-                4 => ['name' => 'Travel Expert', 'color' => '#1B2624', 'bg' => '#F3E8FD', 'difficulty' => 'Expert'],
-                5 => ['name' => 'Master Traveler', 'color' => '#0E2E2B', 'bg' => '#EDE0CB', 'difficulty' => 'Legendary'],
+                1 => ['level' => 1, 'name' => 'Beginner', 'color' => '#7C9187', 'bg' => '#F6EDE0', 'badge' => 'Starter Scout', 'difficulty' => 'Easy', 'min_points' => 0, 'description' => 'Embarking on the Dagupan travel adventure.'],
+                2 => ['level' => 2, 'name' => 'Explorer', 'color' => '#D9622B', 'bg' => '#FFF3E0', 'badge' => 'Active Voyager', 'difficulty' => 'Moderate', 'min_points' => 100, 'description' => 'Discovering curated routes and local food spots.'],
+                3 => ['level' => 3, 'name' => 'Adventure Seeker', 'color' => '#0B3D3A', 'bg' => '#E3F2FD', 'badge' => 'Seasoned Wanderer', 'difficulty' => 'Challenging', 'min_points' => 250, 'description' => 'Mastering multi-day itineraries and budgets.'],
+                4 => ['level' => 4, 'name' => 'Travel Expert', 'color' => '#1B2624', 'bg' => '#F3E8FD', 'badge' => 'City Connoisseur', 'difficulty' => 'Expert', 'min_points' => 500, 'description' => 'Inspiring other travelers with public plans.'],
+                5 => ['level' => 5, 'name' => 'Master Traveler', 'color' => '#B94E1F', 'bg' => '#EDE0CB', 'badge' => 'Legendary Voyager', 'difficulty' => 'Legendary', 'min_points' => 1000, 'description' => 'Ultimate Dagupan explorer with master status.'],
             ];
 
             $currentLevelData = $levelDetails[$level] ?? $levelDetails[1];
             $nextLevelData = $levelDetails[$level + 1] ?? $levelDetails[5];
+            $progressPercent = $nextLevelPoints > 0 ? min(100, max(5, round(($levelProgress / $nextLevelPoints) * 100))) : 100;
 
             return view('dashboard.index', [
                 'user' => $user,
                 'userPlans' => $userPlans,
+                'userPlansCount' => $userPlansCount,
+                'userPublicPlansCount' => $userPublicPlansCount,
+                'totalCommunityPlansCount' => $totalCommunityPlansCount,
                 'otherPublicPlans' => $otherPublicPlans,
                 'level' => $level,
                 'points' => $points,
                 'levelProgress' => $levelProgress,
                 'nextLevelPoints' => $nextLevelPoints,
+                'progressPercent' => $progressPercent,
                 'currentLevelData' => $currentLevelData,
                 'nextLevelData' => $nextLevelData,
+                'levelDetails' => $levelDetails,
             ]);
 
         } catch (\Exception $e) {
@@ -170,7 +182,7 @@ class AuthController extends Controller
                 'endpoint' => 'dashboard',
             ]);
 
-            return redirect('/dashboard')->with('error', 'Unable to load dashboard. Please try again.');
+            return redirect('/planora')->with('error', 'Unable to load dashboard. Please try again.');
         }
     }
 

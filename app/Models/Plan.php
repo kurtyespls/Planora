@@ -38,7 +38,13 @@ class Plan extends Model
         'selected_places' => 'array',
         'budget' => 'decimal:2',
         'total_days' => 'integer',
+        'is_public' => 'boolean',
     ];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 
     /**
      * Label shown in the plan list and on the plan page: the traveller's own

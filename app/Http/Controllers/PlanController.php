@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Hotel;
+use App\Models\Location;
 use App\Models\Plan;
 use App\Services\PlanoraService;
 use Illuminate\Http\Request;
@@ -41,7 +42,7 @@ class PlanController extends Controller
                 'plan_owner' => $plan->user_id,
                 'attempted_by' => $userId,
             ]);
-            return redirect('/dashboard')->with('error', 'Hindi mo ma-access ang plan na ito.');
+            return redirect('/planora')->with('error', 'Hindi mo ma-access ang plan na ito.');
         }
 
         try {
@@ -51,11 +52,47 @@ class PlanController extends Controller
                 ->whereRaw('LOWER(name) = ?', [strtolower($plan->hotel_name)])
                 ->first();
 
+            // ── Map data for the plans map ──
+            // selected_places holds place name strings only (e.g. "SM Center Dagupan (Mall)"),
+            // so we resolve each one against the curated locations table to get coordinates.
+            $placeMarkers = [];
+            foreach ($plan->selected_places ?? [] as $rawName) {
+                $cleanName = preg_replace(
+                    '/\\s*\\((Restaurant|Mall|Beach|Tourest Spot)\\)\\s*$/i',
+                    '',
+                    trim((string) $rawName)
+                );
+                if ($cleanName === '') {
+                    continue;
+                }
+                $location = Location::where('name', $cleanName)->first();
+                if ($location && $location->latitude !== null && $location->longitude !== null) {
+                    $placeMarkers[] = [
+                        'name' => $cleanName,
+                        'lat' => (float) $location->latitude,
+                        'lon' => (float) $location->longitude,
+                        'category' => $location->category,
+                    ];
+                }
+            }
+
+            $hotelCoords = null;
+            if ($hotel && $hotel->lat !== null && $hotel->lon !== null) {
+                $hotelCoords = [
+                    'lat' => (float) $hotel->lat,
+                    'lon' => (float) $hotel->lon,
+                    'name' => $hotel->name,
+                ];
+            }
+
+            $hasMapData = $hotelCoords !== null || count($placeMarkers) > 0;
+
             return view('plans.show', [
                 'plan' => $plan,
                 'hotel' => $hotel,
-                // Regeneration is only meaningful when a real AI model is wired
-                // up, so the button is disabled rather than silently a no-op.
+                'hotelCoords' => $hotelCoords,
+                'placeMarkers' => $placeMarkers,
+                'hasMapData' => $hasMapData,
                 'aiEnabled' => (bool) config('services.groq.key'),
             ]);
         } catch (\Exception $e) {
@@ -79,7 +116,7 @@ class PlanController extends Controller
                 'plan_owner' => $plan->user_id,
                 'attempted_by' => $userId,
             ]);
-            return redirect('/dashboard')->with('error', 'Hindi mo ma-delete ang plan na ito.');
+            return redirect('/planora')->with('error', 'Hindi mo ma-delete ang plan na ito.');
         }
 
         $planId = $plan->id;
@@ -197,9 +234,26 @@ class PlanController extends Controller
      */
     public function publicIndex()
     {
-        $plans = Plan::where('is_public', true)
+        $plans = Plan::with('user')
+            ->where('is_public', true)
             ->orderByDesc('created_at')
             ->get();
+
+        // Resolve hotel coordinates for each plan's map markers
+        $plans->each(function ($plan) {
+            $hotel = Hotel::query()
+                ->whereRaw('LOWER(name) = ?', [strtolower($plan->hotel_name)])
+                ->first();
+
+            $plan->hotelCoords = null;
+            if ($hotel && $hotel->lat !== null && $hotel->lon !== null) {
+                $plan->hotelCoords = [
+                    'lat' => (float) $hotel->lat,
+                    'lon' => (float) $hotel->lon,
+                    'name' => $hotel->name,
+                ];
+            }
+        });
 
         return view('public-plans.index', [
             'plans' => $plans,
@@ -207,7 +261,7 @@ class PlanController extends Controller
     }
 
     /**
-     * Show a specific public plan (anonymized).
+     * Show a specific public plan.
      */
     public function publicShow(Plan $plan)
     {
@@ -216,13 +270,51 @@ class PlanController extends Controller
             abort(404, 'Plan not found.');
         }
 
+        $plan->load('user');
+
         $hotel = Hotel::query()
             ->whereRaw('LOWER(name) = ?', [strtolower($plan->hotel_name)])
             ->first();
 
+        // ── Map data for the public itinerary map ──
+        // selected_places holds place name strings only (e.g. "SM Center Dagupan (Mall)"),
+        // so we resolve each one against the curated locations table to get coordinates.
+        $placeMarkers = [];
+        foreach ($plan->selected_places ?? [] as $rawName) {
+            $cleanName = preg_replace(
+                '/\s*\((Restaurant|Mall|Beach|Tourist Spot)\)\s*$/i',
+                '',
+                trim((string) $rawName)
+            );
+            if ($cleanName === '') {
+                continue;
+            }
+            $location = Location::where('name', $cleanName)->first();
+            if ($location && $location->latitude !== null && $location->longitude !== null) {
+                $placeMarkers[] = [
+                    'name' => $cleanName,
+                    'lat' => (float) $location->latitude,
+                    'lon' => (float) $location->longitude,
+                    'category' => $location->category,
+                ];
+            }
+        }
+
+        $hotelCoords = null;
+        if ($hotel && $hotel->lat !== null && $hotel->lon !== null) {
+            $hotelCoords = [
+                'lat' => (float) $hotel->lat,
+                'lon' => (float) $hotel->lon,
+                'name' => $hotel->name,
+            ];
+        }
+
         return view('public-plans.show', [
             'plan' => $plan,
             'hotel' => $hotel,
+            'hotelCoords' => $hotelCoords,
+            'placeMarkers' => $placeMarkers,
+            'hasMapData' => $hotelCoords !== null || count($placeMarkers) > 0,
         ]);
     }
 
