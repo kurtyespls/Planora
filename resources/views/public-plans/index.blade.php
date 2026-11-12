@@ -129,7 +129,6 @@
             border-color: var(--deep-teal);
         }
 
-        /* Stat Card */
         .stat-card {
             background: var(--card);
             border: 1px solid var(--line);
@@ -143,7 +142,6 @@
             box-shadow: 0 8px 20px -4px rgba(11, 61, 58, 0.08);
         }
 
-        /* Plan Card */
         .plan-card {
             background: var(--card);
             border: 1.5px solid var(--line);
@@ -229,7 +227,6 @@
             white-space: nowrap;
         }
 
-        /* Toast styling */
         .toast-notification {
             position: fixed;
             bottom: 24px;
@@ -523,7 +520,7 @@
                 <!-- Active Filter Status & Reset -->
                 <div x-show="hasActiveFilters" class="mt-3 pt-3 border-t border-[var(--line)] flex items-center justify-between text-xs text-[var(--ink-soft)]">
                     <span>
-                        Showing <strong class="text-[var(--deep-teal)]" x-text="filteredPlansCount"></strong> matching itineraries
+                        Filter active
                     </span>
                     <button @click="resetFilters" class="text-xs font-semibold text-[var(--ember)] hover:underline flex items-center gap-1">
                         <span>Reset all filters</span>
@@ -545,8 +542,8 @@
                     @endphp
 
                     <div 
-                        x-show="matchesPlan({{ $plan->id }}, @js($plan->display_title), @js($plan->hotel_name ?? ''), @js($cleanPlaces), {{ (int) $plan->total_days }}, {{ (float) $plan->budget }}, {{ $plan->created_at->timestamp }})"
-                        class="p-6 group cursor-pointer"
+                        x-show="matchesPlan(@js($plan->display_title), @js($plan->hotel_name ?? ''), @js($cleanPlaces), {{ (int) $plan->total_days }})"
+                        class="plan-card p-6 group cursor-pointer"
                         onclick="if (!event.target.closest('button, a')) window.location.href='/public-plans/{{ $plan->id }}';"
                     >
                         <div>
@@ -657,20 +654,6 @@
                 @endforeach
             </div>
 
-            <!-- Zero Filter Match State (Shown when Alpine filters hide all) -->
-            <div x-show="filteredPlansCount === 0" x-cloak class="stat-card text-center py-12 px-6 my-6">
-                <div class="w-12 h-12 rounded-2xl bg-amber-50 text-[var(--ember)] flex items-center justify-center mx-auto mb-3">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                </div>
-                <h3 class="font-display text-lg font-bold text-[var(--ink)] mb-1">No matching itineraries found</h3>
-                <p class="text-xs text-[var(--ink-soft)] max-w-sm mx-auto mb-4">
-                    Try clearing your search query or selecting "All Days" to view more community travel plans.
-                </p>
-                <button @click="resetFilters" class="btn-secondary text-xs">
-                    Clear Search &amp; Filters
-                </button>
-            </div>
-
         @else
             <!-- Global Empty State: No public plans in DB yet -->
             <div class="stat-card text-center py-16 px-6 max-w-xl mx-auto my-8">
@@ -720,8 +703,6 @@
                 searchQuery: '',
                 durationFilter: 'all',
                 sortBy: 'newest',
-                totalPlans: {{ $plans->count() }},
-                visiblePlanIds: new Set(),
                 toast: {
                     visible: false,
                     message: '',
@@ -730,10 +711,6 @@
 
                 get hasActiveFilters() {
                     return this.searchQuery.trim() !== '' || this.durationFilter !== 'all' || this.sortBy !== 'newest';
-                },
-
-                get filteredPlansCount() {
-                    return this.visiblePlanIds.size;
                 },
 
                 resetFilters() {
@@ -769,7 +746,7 @@
                     }
                 },
 
-                matchesPlan(id, title, hotel, places, days, budget, timestamp) {
+                matchesPlan(title, hotel, places, days) {
                     let matchesSearch = true;
                     if (this.searchQuery.trim() !== '') {
                         const q = this.searchQuery.toLowerCase();
@@ -788,13 +765,7 @@
                         matchesDuration = days >= 3;
                     }
 
-                    const isMatch = matchesSearch && matchesDuration;
-                    if (isMatch) {
-                        this.visiblePlanIds.add(id);
-                    } else {
-                        this.visiblePlanIds.delete(id);
-                    }
-                    return isMatch;
+                    return matchesSearch && matchesDuration;
                 }
             };
         }
